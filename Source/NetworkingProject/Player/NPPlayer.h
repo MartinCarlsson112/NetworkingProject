@@ -29,7 +29,7 @@ public:
 	UFUNCTION(Server, Unreliable)
 	void Server_SendRotation(const FRotator& NewRotation);
 
-	UFUNCTION(Server, Unreliable)
+	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_SendRotation(const FRotator& NewRotation);
 
 
@@ -65,9 +65,9 @@ protected:
 
 
 	const float LocationInterpolationSpeed = 5.0f;
-	const float RotationInterpolationSpeed = 180.0f;
+	const float RotationInterpolationSpeed = 5.0f;
 	const float MinDistance = 1.0f;
-	
+	const float MovementSpeed = 100.0f;
 
 	void BeginPlay() override;
 

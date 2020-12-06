@@ -67,14 +67,14 @@ void ANP_Player::Tick(float DeltaSeconds)
 
 	if (IsLocallyControlled())
 	{
-		MovementComponent->SetFacingRotation(GetActorRotation());
-		Server_SendRotation(MovementComponent->GetFacingRotation());
 
+		MovementComponent->SetFacingRotation(GetActorRotation());
 		MovementComponent->ApplyGravity();
-		MovementData.MovementDelta = (GetActorForwardVector() * MovementInput.X + GetActorRightVector() * MovementInput.Y) * DeltaSeconds * 100.0f;
+		MovementData.MovementDelta = (GetActorForwardVector() * MovementInput.X + GetActorRightVector() * MovementInput.Y) * DeltaSeconds * MovementSpeed;
 		MovementComponent->Move(MovementData);
 
 		Server_SendMove(GetActorLocation());
+		Server_SendRotation(GetActorRotation());
 	}
 
 	else
@@ -92,11 +92,12 @@ void ANP_Player::Tick(float DeltaSeconds)
 				SetActorLocation(TargetLocation);
 			}
 		}
-		const FRotator NewRot = FMath::RInterpTo(MovementComponent->GetFacingRotation(), TargetRotation, DeltaSeconds, RotationInterpolationSpeed);
-		GEngine->AddOnScreenDebugMessage(0, 1.0f, FColor::Blue, NewRot.ToString());
-		MovementComponent->SetFacingRotation(NewRot);
-		SetActorRotation(NewRot);
-		MovementComponent->Move(MovementData);
+
+		if (!TargetRotation.Equals(GetActorRotation()))
+		{
+			const FRotator NewRot = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaSeconds, RotationInterpolationSpeed);
+			SetActorRotation(NewRot);
+		}
 	}
 
 }
@@ -124,8 +125,6 @@ void ANP_Player::Multicast_SendRotation_Implementation(const FRotator& NewRotati
 {
 	if (!IsLocallyControlled())
 	{
-
-		
 		TargetRotation = NewRotation;
 	}
 }

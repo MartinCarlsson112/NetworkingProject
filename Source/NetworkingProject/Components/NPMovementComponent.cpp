@@ -30,7 +30,7 @@ FNPMovementData UNPMovementComponent::CreateMovementData() const
 void UNPMovementComponent::Move(FNPMovementData& FrameMovement)
 {
 	Hit.Reset();
-	FVector Delta = GetMovementDelta(FrameMovement);
+	FVector Delta = GetMovementDelta(FrameMovement) + FVector(0, 0, AccumulatedGravity);
 	MoveUpdatedComponent(Delta, FacingRotationCurrent, true, &Hit);
 
 	if (Hit.bBlockingHit && FVector::DotProduct(FVector::UpVector, Hit.Normal) > 0.0f)
