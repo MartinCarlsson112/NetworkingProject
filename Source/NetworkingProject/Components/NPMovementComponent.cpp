@@ -4,6 +4,7 @@ UNPMovementComponent::UNPMovementComponent()
 {
 	Gravity = 30;
 	FacingRotationSpeed = 1;
+	PrimaryComponentTick.bCanEverTick = true;
 
 }
 
@@ -11,19 +12,12 @@ UNPMovementComponent::UNPMovementComponent()
 void UNPMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-
 	FacingRotationCurrent = FQuat::Slerp(FacingRotationCurrent.Quaternion(), FacingRotationTarget.Quaternion(), FacingRotationSpeed * DeltaTime).Rotator();
-
 	if (FacingRotationCurrent.Equals(FacingRotationTarget))
 	{
-		//If facing rotation current equals facing rotation target why do we set it ?
-
 		FacingRotationCurrent = FacingRotationTarget;
 		SetComponentTickEnabled(false);
 	}
-
-
 }
 
 FNPMovementData UNPMovementComponent::CreateMovementData() const
@@ -53,7 +47,7 @@ void UNPMovementComponent::Move(FNPMovementData& FrameMovement)
 
 void UNPMovementComponent::ApplyGravity()
 {
-	AccumulatedGravity += Gravity * GetWorld()->GetDeltaSeconds();
+	AccumulatedGravity -= Gravity * GetWorld()->GetDeltaSeconds();
 }
 
 void UNPMovementComponent::SetFacingRotation(const FRotator& InFacingRotation, float InRotationSpeed)
@@ -73,6 +67,11 @@ void UNPMovementComponent::SetFacingRotation(const FRotator& InFacingRotation, f
 		SetComponentTickEnabled(true);
 	}
 
+}
+
+void UNPMovementComponent::UpdateComponentRotationOnly()
+{
+	MoveUpdatedComponent(FVector::ZeroVector, FacingRotationCurrent, true, &Hit);
 }
 
 FVector UNPMovementComponent::GetMovementDelta(const FNPMovementData& FrameMovement) const
