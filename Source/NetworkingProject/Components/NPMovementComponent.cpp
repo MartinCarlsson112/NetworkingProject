@@ -1,17 +1,26 @@
 #include "NPMovementComponent.h"
+#include "DrawDebugHelpers.h"
 
 UNPMovementComponent::UNPMovementComponent()
 {
 	Gravity = 30;
 	FacingRotationSpeed = 1;
 	PrimaryComponentTick.bCanEverTick = true;
+	bHasLaunchVelocity = false;
+	bPendingXYOverride = false;
+	bPendingZOverride = false;
 
+	JumpHeight = 200.0f;
+	JumpTime = 0.25f;
+	JumpAccu = 0;
+	JumpUpdateFreq = 0.01f;
 }
 
 
 void UNPMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
 	FacingRotationCurrent = FQuat::Slerp(FacingRotationCurrent.Quaternion(), FacingRotationTarget.Quaternion(), FacingRotationSpeed * DeltaTime).Rotator();
 	if (FacingRotationCurrent.Equals(FacingRotationTarget))
 	{
@@ -30,14 +39,41 @@ FNPMovementData UNPMovementComponent::CreateMovementData() const
 void UNPMovementComponent::Move(FNPMovementData& FrameMovement)
 {
 	Hit.Reset();
+	
 	FVector Delta = GetMovementDelta(FrameMovement) + FVector(0, 0, AccumulatedGravity);
+
+	if (bHasLaunchVelocity)
+	{
+		HandleLaunch(Delta);
+	}
+	
 	MoveUpdatedComponent(Delta, FacingRotationCurrent, true, &Hit);
 
-	if (Hit.bBlockingHit && FVector::DotProduct(FVector::UpVector, Hit.Normal) > 0.0f)
+
+	FVector GroundStartLocation = GetOwner()->GetActorLocation() - FVector(0, 0, -CharacterHalfHeight);
+	FVector GroundEndLocation = GroundStartLocation - FVector(0, 0, 10.0f);
+	DrawDebugLine(GetWorld(), GroundStartLocation, GroundEndLocation, FColor::Yellow, false, 1.0f);
+
+	FCollisionQueryParams CollisionQueryParams;
+	CollisionQueryParams.AddIgnoredActor(GetOwner());
+	CollisionQueryParams.bFindInitialOverlaps = true;
+
+
+	GetWorld()->LineTraceSingleByChannel(GroundHitResult,
+		GroundStartLocation,
+		GroundEndLocation, ECC_WorldStatic, CollisionQueryParams);
+
+	if ((Hit.bBlockingHit && FVector::DotProduct(FVector::UpVector, Hit.Normal) > 0.0f) || GroundHitResult.bBlockingHit && FVector::DotProduct(FVector::UpVector, GroundHitResult.Normal) > 0)
 	{
+		MovementState = EMS_Grounded;
 		AccumulatedGravity = 0;
 		Delta = GetMovementDelta(FrameMovement);
 	}
+	else 
+	{
+		MovementState = EMS_InAir;
+	}
+
 
 	SlideAlongSurface(Delta, 1.0f - Hit.Time, Hit.Normal, Hit);
 
@@ -45,9 +81,41 @@ void UNPMovementComponent::Move(FNPMovementData& FrameMovement)
 	FrameMovement.FinalLocation = UpdatedComponent->GetComponentLocation();
 }
 
+void UNPMovementComponent::HandleLaunch(FVector& MovementDelta)
+{
+	FVector FinalVel = PendingLaunchVelocity;
+
+	if (!bPendingXYOverride)
+	{
+		FinalVel.X += MovementDelta.X;
+		FinalVel.Y += MovementDelta.Y;
+	}
+	if (!bPendingZOverride)
+	{
+		FinalVel.Z += MovementDelta.Z;
+	}
+	else
+	{
+		AccumulatedGravity = 0;
+	}
+
+	MovementDelta = FinalVel;
+	bHasLaunchVelocity = false;
+	bPendingXYOverride = false;
+	bPendingZOverride = false;
+}
+
 void UNPMovementComponent::ApplyGravity()
 {
 	AccumulatedGravity -= Gravity * GetWorld()->GetDeltaSeconds();
+}
+
+void UNPMovementComponent::LaunchCharacter(const FVector& LaunchVelocity, bool bXYOverride, bool bZOverride)
+{
+	PendingLaunchVelocity = LaunchVelocity;
+	bPendingXYOverride = bXYOverride;
+	bPendingZOverride = bZOverride;
+	bHasLaunchVelocity = true;
 }
 
 void UNPMovementComponent::SetFacingRotation(const FRotator& InFacingRotation, float InRotationSpeed)
@@ -72,6 +140,29 @@ void UNPMovementComponent::SetFacingRotation(const FRotator& InFacingRotation, f
 void UNPMovementComponent::UpdateComponentRotationOnly()
 {
 	MoveUpdatedComponent(FVector::ZeroVector, FacingRotationCurrent, true, &Hit);
+}
+
+void UNPMovementComponent::Jump()
+{
+	if (!IsJumping() && CanJump())
+	{
+		GetWorld()->GetTimerManager().SetTimer(JumpTimerHandle, this, &UNPMovementComponent::Jump_Impl, JumpUpdateFreq, true);
+	}
+}
+
+void UNPMovementComponent::Jump_Impl()
+{
+	auto DeltaTime = JumpUpdateFreq;
+	JumpAccu += DeltaTime;
+	if (JumpAccu >= JumpTime)
+	{
+		JumpAccu = 0;
+		GetWorld()->GetTimerManager().ClearTimer(JumpTimerHandle);
+	}
+	else if (JumpTime != 0)
+	{
+		LaunchCharacter(FVector(0, 0, (JumpHeight / JumpTime) * DeltaTime), false, true);
+	}
 }
 
 FVector UNPMovementComponent::GetMovementDelta(const FNPMovementData& FrameMovement) const

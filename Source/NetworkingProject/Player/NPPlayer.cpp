@@ -4,7 +4,11 @@
 #include "Engine/CollisionProfile.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "../Projectile/NPBaseProjectile.h"
+#include "../Projectile/NPArrowProjectile.h"
 
+#define concat(first, second) first second
+#define intchar(x) #x
 ANP_Player::ANP_Player()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -27,7 +31,7 @@ ANP_Player::ANP_Player()
 	{
 		Mesh->AlwaysLoadOnClient = true;
 		Mesh->AlwaysLoadOnServer = true;
-		Mesh->bOwnerNoSee = false;
+		Mesh->bOwnerNoSee = true;
 		Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
 		Mesh->bCastDynamicShadow = true;
 		Mesh->bAffectDynamicIndirectLighting = true;
@@ -39,7 +43,47 @@ ANP_Player::ANP_Player()
 		Mesh->SetCanEverAffectNavigation(false);
 	}
 
+	FPMesh = CreateOptionalDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonMesh v"));
+	if (FPMesh)
+	{
+		FPMesh->AlwaysLoadOnClient = true;
+		FPMesh->AlwaysLoadOnServer = true;
+		FPMesh->bOwnerNoSee = false;
+		FPMesh->bOnlyOwnerSee = true;
+		FPMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+		FPMesh->bCastDynamicShadow = true;
+		FPMesh->bAffectDynamicIndirectLighting = true;
+		FPMesh->PrimaryComponentTick.TickGroup = TG_PrePhysics;
+		FPMesh->SetupAttachment(CapsuleComponent);
+		static FName MeshCollisionProfileName(TEXT("NoCollision"));
+		FPMesh->SetCollisionProfileName(MeshCollisionProfileName);
+		FPMesh->SetGenerateOverlapEvents(false);
+		FPMesh->SetCanEverAffectNavigation(false);
+	}
+	FirePosition = CreateDefaultSubobject<USceneComponent>(TEXT("FirePosition v"));
+	FirePosition->AttachToComponent(CapsuleComponent, FAttachmentTransformRules::KeepRelativeTransform);
+
+	ShootingComponent = CreateDefaultSubobject<UNPShootingComponent>(TEXT("ShootingComponent v"));
+
+	AmmoComponent = CreateDefaultSubobject<UNPAmmoComponent>(TEXT("AmmoComponent v"));
+	AmmoComponent->AddAmmoContainer(UNPArrowProjectile::StaticClass(), 30, 30);
+
+	HealthComponent = CreateDefaultSubobject<UNPHealthComponent>(TEXT("HealthComponent v"));
+
+
+	Projectiles.SetNum(10);
+	for (int i = 0; i < 10; i++)
+	{
+		Projectiles[i] = CreateDefaultSubobject<UNPArrowProjectile>(TEXT("Projectiles V " + i));
+	}
+	MovementSpeed = 500.0f;
+
+	ArrowForce = 2000.0f;
+	MovementInput = FVector::ZeroVector;
+	TargetLocation = GetActorLocation();
+
 }
+
 
 void ANP_Player::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
@@ -47,30 +91,30 @@ void ANP_Player::SetupPlayerInputComponent(class UInputComponent* PlayerInputCom
 
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ANP_Player::OnJumpPressed);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ANP_Player::OnJumpReleased);
-
 	PlayerInputComponent->BindAxis("Forward", this, &ANP_Player::MoveForward);
 	PlayerInputComponent->BindAxis("Right", this, &ANP_Player::MoveRight);
-
-
 	PlayerInputComponent->BindAxis("Turn", this, &ANP_Player::Turn);
+	PlayerInputComponent->BindAction("Shoot", IE_Pressed, this, &ANP_Player::StartCharging);
+	PlayerInputComponent->BindAction("Shoot", IE_Released, this, &ANP_Player::Shoot);
+
 	//PlayerInputComponent->BindAxis("TurnRate", this, &ANP_Player::TurnAtRate);
 	PlayerInputComponent->BindAxis("Look", this, &ANP_Player::Look);
 	//PlayerInputComponent->BindAxis("LookUpRate", this, &ANP_Player::LookUpAtRate);
-
 }
 
 void ANP_Player::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	FNPMovementData MovementData = MovementComponent->CreateMovementData();
-
 	if (IsLocallyControlled())
 	{
-
+		FNPMovementData MovementData = MovementComponent->CreateMovementData();
 		MovementComponent->SetFacingRotation(GetActorRotation());
 		MovementComponent->ApplyGravity();
-		MovementData.MovementDelta = (GetActorForwardVector() * MovementInput.X + GetActorRightVector() * MovementInput.Y) * DeltaSeconds * MovementSpeed;
+
+		auto Forward = GetActorForwardVector();
+		auto Right = GetActorRightVector();
+		MovementData.MovementDelta = (Forward * MovementInput.X + Right * MovementInput.Y) * DeltaSeconds * MovementSpeed;
 		MovementComponent->Move(MovementData);
 
 		Server_SendMove(GetActorLocation());
@@ -79,7 +123,6 @@ void ANP_Player::Tick(float DeltaSeconds)
 
 	else
 	{
-
 		if (!TargetLocation.Equals(GetActorLocation()))
 		{
 			const FVector NewLoc = FMath::VInterpTo(GetActorLocation(), TargetLocation, DeltaSeconds, LocationInterpolationSpeed);
@@ -92,10 +135,9 @@ void ANP_Player::Tick(float DeltaSeconds)
 				SetActorLocation(TargetLocation);
 			}
 		}
-
-		if (!TargetRotation.Equals(GetActorRotation()))
+		if (!ReplicatedRotation.Equals(GetActorRotation()))
 		{
-			const FRotator NewRot = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaSeconds, RotationInterpolationSpeed);
+			const FRotator NewRot = FMath::RInterpTo(GetActorRotation(), ReplicatedRotation, DeltaSeconds, RotationInterpolationSpeed);
 			SetActorRotation(NewRot);
 		}
 	}
@@ -118,32 +160,52 @@ void ANP_Player::Multicast_SendLocation_Implementation(const FVector& NewLocatio
 
 void ANP_Player::Server_SendRotation_Implementation(const FRotator& NewRotation)
 {
-	Multicast_SendRotation(NewRotation);
+	ReplicatedRotation = NewRotation;
 }
 
-void ANP_Player::Multicast_SendRotation_Implementation(const FRotator& NewRotation)
+
+
+void ANP_Player::Server_FireProjectile_Implementation(int ProjectileToShoot, const FVector& ArrowStartPosition, const FRotator& FacingRotation)
 {
-	if (!IsLocallyControlled())
+	Multicast_FireProjectile(ProjectileToShoot, ArrowStartPosition, FacingRotation);
+}
+
+void ANP_Player::Multicast_FireProjectile_Implementation(int ProjectileToShoot, const FVector& ArrowStartPosition, const FRotator& FacingRotation)
+{
+	if (!ensure(ProjectileToShoot != -1))
+		return;
+
+	//float ChargeAmount = ShootingComponent->Fire();
+	//ProjectileToShoot->Fire(this, GetControlRotation().Vector(), ChargeAmount * ArrowForce, ArrowDamageMultiplier);
+
+	//if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
-		TargetRotation = NewRotation;
+		//NewRocket->ApplyCorrection(FacingRotation.Vector());
+	}
+	//else
+	{
+		float ChargeAmount = ShootingComponent->Fire() / ShootingComponent->ChargeTime;
+		Projectiles[ProjectileToShoot]->Fire(this, ArrowStartPosition, FacingRotation, (0.3f + ChargeAmount) * ArrowForce, ArrowDamageMultiplier);
+		//((ANPBaseProjectile*)ProjectilePool->Pool[ProjectileToShoot])->Fire(this, ArrowStartPosition, FacingRotation, ChargeAmount * ArrowForce, ArrowDamageMultiplier);
 	}
 }
 
 int32 ANP_Player::GetPing() const
 {
 	auto State = GetPlayerState();
-
 	if (State)
 	{
-		return static_cast<int32>(State->GetPing());
+		return static_cast<int32>(State->GetPing()) * 4;
 	}
-
 	return 0;
 }
 
 void ANP_Player::OnJumpPressed()
 {
-
+	if (MovementComponent->CanJump())
+	{	
+		MovementComponent->Jump();
+	}
 }
 
 void ANP_Player::OnJumpReleased()
@@ -171,9 +233,79 @@ void ANP_Player::Look(float Value)
 	AddControllerPitchInput(Value);
 }
 
+void ANP_Player::StartCharging()
+{
+	ShootingComponent->StartCharging();
+}
+
+void ANP_Player::Shoot()
+{
+	Server_FireProjectile(counter, FirePosition->GetComponentLocation(), GetControlRotation());
+	counter++;
+	if (counter >= 10)
+	{
+		counter = 0;
+	}
+
+
+	//if (ProjectilePool->HasFreeObject())
+	{
+	//	ANPBaseProjectile* BaseProjectile = (ANPBaseProjectile*)ProjectilePool->GetPooledObject();
+	//	Server_FireProjectile(BaseProjectile->Index, GetActorLocation(), GetControlRotation());
+	}
+	//else
+	{
+	//	ShootingComponent->StopCharging();
+	}
+	/*if (GetLocalRole() >= ROLE_AutonomousProxy)
+	{*/
+		//if (HasAuthority())
+		//{
+			
+		//}
+		//else
+		//{
+		//	if (ProjectilePool->HasFreeObject())
+		//	{
+		//		ANPBaseProjectile* BaseProjectile = (ANPBaseProjectile*)ProjectilePool->GetPooledObject();
+		//		//start moving
+		//		//And then correct position later
+		//		Server_FireProjectile(BaseProjectile, FirePosition->GetComponentLocation(), GetControlRotation());
+		//	}
+		//	else
+		//	{
+		//		ShootingComponent->StopCharging();
+		//	}
+		//}
+		//
+	//}
+}
+
+void ANP_Player::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ANP_Player, ReplicatedRotation);
+}
+
+bool ANP_Player::CanDamage_Implementation() const
+{
+	return true;
+}
+
+void ANP_Player::ReceiveDamage_Implementation(float Damage, ANP_Player* _Instigator)
+{
+	if (HealthComponent->ReceiveDamage(Damage))
+	{
+		//We died
+	}
+}
+
 void ANP_Player::BeginPlay()
 {
 	Super::BeginPlay();
-
+	for (int i = 0; i < 10; i++)
+	{
+		Projectiles[i]->SetStaticMesh(ProjectileMesh);
+	}
 }
 
