@@ -10,8 +10,14 @@ class NETWORKINGPROJECT_API UNPBaseProjectile : public UStaticMeshComponent
 
 public:
 	UNPBaseProjectile();
-
+	
 	UFUNCTION(BlueprintCallable)
-	virtual void Fire(AActor* Shooter, const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier);
+	virtual void Fire(const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier);
 
+
+	void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	virtual void ActivateArrow();
+	virtual void DeactivateArrow();
+private:
 };

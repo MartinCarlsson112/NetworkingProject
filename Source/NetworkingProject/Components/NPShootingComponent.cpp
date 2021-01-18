@@ -3,16 +3,18 @@
 UNPShootingComponent::UNPShootingComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+
+	SetIsReplicatedByDefault(true);
 	ChargeUpdateFrequency = 0.01f;
 	ChargeCD = 0.2f;
 	ChargeTime = 1.0f;
+	BaseChargeAmount = 0.3f;
 	ChargeSpeedMultiplier = 1.0f;
 }
 
 
-float UNPShootingComponent::Fire()
+const float UNPShootingComponent::Fire()
 {
-
 	auto ChargeResult = ChargeAccu;
 	if (IsTimerActive())
 	{
@@ -20,8 +22,9 @@ float UNPShootingComponent::Fire()
 		ChargeAccu = 0;
 		OnFire.Broadcast();
 		Disable(ChargeCD);
-	}
-	return ChargeResult;
+	}		
+	float ChargeAmount = ChargeResult / ChargeTime;
+	return ChargeAmount + BaseChargeAmount;
 }
 
 bool UNPShootingComponent::CanStartCharging() const

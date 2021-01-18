@@ -12,7 +12,8 @@ class NETWORKINGPROJECT_API UNPArrowProjectile : public UNPBaseProjectile
 	GENERATED_BODY()
 public:
 	UNPArrowProjectile();
-	void Fire(AActor* Shooter, const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier) override;
+	
+	void Fire(const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier) override;
 	void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	UFUNCTION()
@@ -29,6 +30,7 @@ public:
 
 protected:
 	void BeginPlay() override;
+
 
 	FVector InitialDirection;
 	FVector CurrentVelocity;
@@ -48,6 +50,7 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	float CurrentDamage;
+
 
 	FTimerHandle LifetimeTimerHandle;
 };

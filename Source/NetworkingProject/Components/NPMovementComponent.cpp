@@ -49,8 +49,10 @@ void UNPMovementComponent::Move(FNPMovementData& FrameMovement)
 	
 	MoveUpdatedComponent(Delta, FacingRotationCurrent, true, &Hit);
 
+	auto OwnerLoc = GetOwner()->GetActorLocation();
 
-	FVector GroundStartLocation = GetOwner()->GetActorLocation() - FVector(0, 0, -CharacterHalfHeight);
+
+	FVector GroundStartLocation = GetOwner()->GetActorLocation() - FVector(0, 0, CharacterHalfHeight);
 	FVector GroundEndLocation = GroundStartLocation - FVector(0, 0, 10.0f);
 	DrawDebugLine(GetWorld(), GroundStartLocation, GroundEndLocation, FColor::Yellow, false, 1.0f);
 
@@ -58,20 +60,27 @@ void UNPMovementComponent::Move(FNPMovementData& FrameMovement)
 	CollisionQueryParams.AddIgnoredActor(GetOwner());
 	CollisionQueryParams.bFindInitialOverlaps = true;
 
+	FCollisionShape MyBox = FCollisionShape::MakeBox(FVector(44.0f, 44.0f, 10.0f));
+	GetWorld()->SweepSingleByChannel(GroundHitResult, GroundStartLocation, GroundEndLocation, FQuat::Identity, ECC_WorldStatic, MyBox);
 
-	GetWorld()->LineTraceSingleByChannel(GroundHitResult,
-		GroundStartLocation,
-		GroundEndLocation, ECC_WorldStatic, CollisionQueryParams);
+	DrawDebugBox(GetWorld(), GroundStartLocation, FVector(44.0f, 44.0f, 10.0f), FColor::Yellow, false, 1.0f);
+
+
+	//GetWorld()->LineTraceSingleByChannel(GroundHitResult,
+	//	GroundStartLocation,
+	//	GroundEndLocation, ECC_WorldStatic, CollisionQueryParams);
 
 	if ((Hit.bBlockingHit && FVector::DotProduct(FVector::UpVector, Hit.Normal) > 0.0f) || GroundHitResult.bBlockingHit && FVector::DotProduct(FVector::UpVector, GroundHitResult.Normal) > 0)
 	{
 		MovementState = EMS_Grounded;
 		AccumulatedGravity = 0;
 		Delta = GetMovementDelta(FrameMovement);
+		GEngine->AddOnScreenDebugMessage(1, 0.1f, FColor::Emerald, "Grounded");
 	}
 	else 
 	{
 		MovementState = EMS_InAir;
+		GEngine->AddOnScreenDebugMessage(2, 0.05f, FColor::Emerald, "Not Grounded");
 	}
 
 

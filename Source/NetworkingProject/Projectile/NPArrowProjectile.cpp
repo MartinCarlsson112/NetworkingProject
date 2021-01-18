@@ -1,5 +1,5 @@
 #include "NPArrowProjectile.h"
-
+#include "../Interfaces/DamageableInterface.h"
 UNPArrowProjectile::UNPArrowProjectile()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -10,18 +10,14 @@ UNPArrowProjectile::UNPArrowProjectile()
 	SetNotifyRigidBodyCollision(false);
 }
 
-void UNPArrowProjectile::Fire(AActor* Shooter, const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier)
+
+void UNPArrowProjectile::Fire(const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier)
 {
 	SetWorldLocation(StartPosition);
 	InitialDirection = Direction.Vector();
 	SetWorldRotation(Direction);
 	CurrentVelocity = Direction.Vector() * Power;
-
-	SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	SetComponentTickEnabled(true);
-	SetGenerateOverlapEvents(true);
-	SetHiddenInGame(false);
-
+	ActivateArrow();
 	GetWorld()->GetTimerManager().SetTimer(LifetimeTimerHandle, this, &UNPArrowProjectile::Expire, ArrowLifetime, false);
 }
 
@@ -33,45 +29,42 @@ void UNPArrowProjectile::OnCollision(class UPrimitiveComponent* OverlapComponent
 		return;
 	}
 
-	//Attack target
-	//Other->ImplementsInterface
-	//if Other->CanDamage()
-		//Other->ReceiveDamage(CurrentDamage)
+	if (GetOwner()->GetLocalRole() == ROLE_Authority)
+	{
+		GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.1f, FColor::Blue, "Collided");
+
+		if (OtherActor->GetClass()->ImplementsInterface(UDamageableInterface::StaticClass()))
+		{
+			IDamageableInterface::Execute_ReceiveDamage(OtherActor, ArrowDamage, GetOwner());
+		}
+	}
+	//predict health change
 
 	//Disable Collisions
 	SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	//Disable movement
 	SetComponentTickEnabled(false);
 
-	//Start timer to return the object
+	//Start timer for arrow to expire after hitting a target
 	if (GetWorld()->GetTimerManager().IsTimerActive(LifetimeTimerHandle))
 	{
 		GetWorld()->GetTimerManager().ClearTimer(LifetimeTimerHandle);
 	}
 	GetWorld()->GetTimerManager().SetTimer(LifetimeTimerHandle, this, &UNPArrowProjectile::Expire, ArrowHitLifetime, false);
-
-	GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.1f , FColor::Blue, "Collided");
 }
 
 void UNPArrowProjectile::Expire()
 {
-	SetHiddenInGame(true);
-	//disable collision
-	SetComponentTickEnabled(false);
+	DeactivateArrow();
 }
 
 void UNPArrowProjectile::BeginPlay()
 {
 	Super::BeginPlay();
-	SetComponentTickEnabled(false);
-	SetSimulatePhysics(false);
-	SetHiddenInGame(true);
+	DeactivateArrow();
 
 	SetNotifyRigidBodyCollision(false);
-	SetGenerateOverlapEvents(true);
 	SetCollisionProfileName("OverlapAll");
-
-	SetGenerateOverlapEvents(true);
 	OnComponentBeginOverlap.AddDynamic(this, &UNPArrowProjectile::OnCollision);
 }
 

@@ -13,7 +13,7 @@ public:
 	UNPShootingComponent();
 
 	UFUNCTION(BlueprintCallable)
-	float Fire();
+	const float Fire();
 	UFUNCTION(BlueprintCallable)
 	bool CanStartCharging() const;
 	UFUNCTION(BlueprintCallable)
@@ -35,8 +35,7 @@ public:
 	FShootingDelegate OnDisabled;
 	UPROPERTY(BlueprintAssignable)
 	FShootingDelegate OnActivated;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
-		float ChargeTime;
+
 
 protected:
 	void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -46,12 +45,18 @@ private:
 
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
-		float ChargeCD;
+	float ChargeCD;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
 	float ChargeUpdateFrequency;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
 	float ChargeSpeedMultiplier;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
+	float BaseChargeAmount;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
+	float ChargeTime;
 
 	UFUNCTION()
 	void DisableEnd();

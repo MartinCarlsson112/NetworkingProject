@@ -7,6 +7,8 @@ class NETWORKINGPROJECT_API UNPHealthComponent : public UActorComponent
 {
 	GENERATED_BODY()
 public:
+	UNPHealthComponent();
+
 
 	UFUNCTION(BlueprintCallable)
 	bool ReceiveDamage(float Amount);

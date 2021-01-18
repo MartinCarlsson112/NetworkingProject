@@ -1,16 +1,20 @@
 #include "NPHealthComponent.h"
 
+UNPHealthComponent::UNPHealthComponent()
+{
+	MaxHealth = 100;
+	Health = MaxHealth;
+}
+
 bool UNPHealthComponent::ReceiveDamage(float Amount)
 {
 	Health -= Amount;
-
 	Health = FMath::Clamp<float>(Health, 0, MaxHealth);
-
 	if (Health > 0)
 	{
-		return false;
+		return true;
 	}
-	return true;
+	return false;
 }
 
 void UNPHealthComponent::ReceiveHealing(float Amount)

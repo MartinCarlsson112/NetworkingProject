@@ -7,6 +7,7 @@
 #include "../Components/NPShootingComponent.h"
 #include "../Components/NPAmmoComponent.h"
 #include "../Interfaces/DamageableInterface.h"
+#include "../Interfaces/PlayerControlInterface.h"
 #include "NPPlayer.generated.h"
 
 class UNPMovementComponent;
@@ -14,14 +15,12 @@ class UCapsuleComponent;
 class USkeletalMeshComponent;
 
 UCLASS(Blueprintable, BlueprintType)
-class NETWORKINGPROJECT_API ANP_Player : public APawn, public IDamageableInterface
+class NETWORKINGPROJECT_API ANP_Player : public APawn, public IDamageableInterface, public IPlayerControlInterface
 {
 	GENERATED_BODY()
 
 public:
 	ANP_Player();
-
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	void Tick(float DeltaSeconds) override;
 
@@ -39,6 +38,9 @@ public:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_FireProjectile(int ProjectileToShoot, const FVector& ArrowStartPosition, const FRotator& FacingRotation);
+
+	UFUNCTION(Server, Reliable)
+	void Server_StartCharging();
 
 	UFUNCTION(BlueprintPure)
 	int32 GetPing() const;
@@ -67,21 +69,22 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Shooting)
 	TArray<UNPBaseProjectile*> Projectiles;
 
-
-	void OnJumpPressed();
-	void OnJumpReleased();
-	void MoveForward(float value);
-	void MoveRight(float value);
-	void Turn(float value);
-	void Look(float value);
-
-	void StartCharging();
-	void Shoot();
-
 	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	void ReceiveDamage_Implementation(float Damage, ANP_Player* Instigator) override;
+	FDamageResult ReceiveDamage_Implementation(float Damage, AActor* Instigator) override;
 	bool CanDamage_Implementation() const override;
+
+	void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	//Player Control Interface
+	void JumpPressed_Implementation() override;
+	void FireButtonPressed_Implementation() override;
+	void FireButtonReleased_Implementation() override;
+	void MoveForward_Implementation(float value) override;
+	void MoveRight_Implementation(float value) override;
+	void Turn_Implementation(float value) override;
+	void Look_Implementation(float value) override;
+	void JumpReleased_Implementation() override;
 
 protected:
 	void BeginPlay() override;

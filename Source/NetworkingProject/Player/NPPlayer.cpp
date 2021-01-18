@@ -7,8 +7,6 @@
 #include "../Projectile/NPBaseProjectile.h"
 #include "../Projectile/NPArrowProjectile.h"
 
-#define concat(first, second) first second
-#define intchar(x) #x
 ANP_Player::ANP_Player()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -70,11 +68,12 @@ ANP_Player::ANP_Player()
 
 	HealthComponent = CreateDefaultSubobject<UNPHealthComponent>(TEXT("HealthComponent v"));
 
-
 	Projectiles.SetNum(10);
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < Projectiles.Num(); i++)
 	{
 		Projectiles[i] = CreateDefaultSubobject<UNPArrowProjectile>(TEXT("Projectiles V " + i));
+		Projectiles[i]->AddToRoot();
+
 	}
 	MovementSpeed = 500.0f;
 
@@ -84,22 +83,13 @@ ANP_Player::ANP_Player()
 
 }
 
-
-void ANP_Player::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
+void ANP_Player::BeginPlay()
 {
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ANP_Player::OnJumpPressed);
-	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ANP_Player::OnJumpReleased);
-	PlayerInputComponent->BindAxis("Forward", this, &ANP_Player::MoveForward);
-	PlayerInputComponent->BindAxis("Right", this, &ANP_Player::MoveRight);
-	PlayerInputComponent->BindAxis("Turn", this, &ANP_Player::Turn);
-	PlayerInputComponent->BindAction("Shoot", IE_Pressed, this, &ANP_Player::StartCharging);
-	PlayerInputComponent->BindAction("Shoot", IE_Released, this, &ANP_Player::Shoot);
-
-	//PlayerInputComponent->BindAxis("TurnRate", this, &ANP_Player::TurnAtRate);
-	PlayerInputComponent->BindAxis("Look", this, &ANP_Player::Look);
-	//PlayerInputComponent->BindAxis("LookUpRate", this, &ANP_Player::LookUpAtRate);
+	Super::BeginPlay();
+	for (int i = 0; i < Projectiles.Num(); i++)
+	{
+		Projectiles[i]->SetStaticMesh(ProjectileMesh);
+	}
 }
 
 void ANP_Player::Tick(float DeltaSeconds)
@@ -184,10 +174,15 @@ void ANP_Player::Multicast_FireProjectile_Implementation(int ProjectileToShoot, 
 	}
 	//else
 	{
-		float ChargeAmount = ShootingComponent->Fire() / ShootingComponent->ChargeTime;
-		Projectiles[ProjectileToShoot]->Fire(this, ArrowStartPosition, FacingRotation, (0.3f + ChargeAmount) * ArrowForce, ArrowDamageMultiplier);
+		float ChargeAmount = ShootingComponent->Fire();
+		Projectiles[ProjectileToShoot]->Fire(ArrowStartPosition, FacingRotation, ChargeAmount * ArrowForce , ArrowDamageMultiplier);
 		//((ANPBaseProjectile*)ProjectilePool->Pool[ProjectileToShoot])->Fire(this, ArrowStartPosition, FacingRotation, ChargeAmount * ArrowForce, ArrowDamageMultiplier);
 	}
+}
+
+void ANP_Player::Server_StartCharging_Implementation()
+{
+	ShootingComponent->StartCharging();
 }
 
 int32 ANP_Player::GetPing() const
@@ -200,86 +195,6 @@ int32 ANP_Player::GetPing() const
 	return 0;
 }
 
-void ANP_Player::OnJumpPressed()
-{
-	if (MovementComponent->CanJump())
-	{	
-		MovementComponent->Jump();
-	}
-}
-
-void ANP_Player::OnJumpReleased()
-{
-
-}
-
-void ANP_Player::MoveForward(float value)
-{
-	MovementInput.X = value;
-}
-
-void ANP_Player::MoveRight(float value)
-{
-	MovementInput.Y = value;
-}
-
-void ANP_Player::Turn(float Value)
-{
-	AddControllerYawInput(Value);
-}
-
-void ANP_Player::Look(float Value)
-{
-	AddControllerPitchInput(Value);
-}
-
-void ANP_Player::StartCharging()
-{
-	ShootingComponent->StartCharging();
-}
-
-void ANP_Player::Shoot()
-{
-	Server_FireProjectile(counter, FirePosition->GetComponentLocation(), GetControlRotation());
-	counter++;
-	if (counter >= 10)
-	{
-		counter = 0;
-	}
-
-
-	//if (ProjectilePool->HasFreeObject())
-	{
-	//	ANPBaseProjectile* BaseProjectile = (ANPBaseProjectile*)ProjectilePool->GetPooledObject();
-	//	Server_FireProjectile(BaseProjectile->Index, GetActorLocation(), GetControlRotation());
-	}
-	//else
-	{
-	//	ShootingComponent->StopCharging();
-	}
-	/*if (GetLocalRole() >= ROLE_AutonomousProxy)
-	{*/
-		//if (HasAuthority())
-		//{
-			
-		//}
-		//else
-		//{
-		//	if (ProjectilePool->HasFreeObject())
-		//	{
-		//		ANPBaseProjectile* BaseProjectile = (ANPBaseProjectile*)ProjectilePool->GetPooledObject();
-		//		//start moving
-		//		//And then correct position later
-		//		Server_FireProjectile(BaseProjectile, FirePosition->GetComponentLocation(), GetControlRotation());
-		//	}
-		//	else
-		//	{
-		//		ShootingComponent->StopCharging();
-		//	}
-		//}
-		//
-	//}
-}
 
 void ANP_Player::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -287,25 +202,119 @@ void ANP_Player::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(ANP_Player, ReplicatedRotation);
 }
 
+void ANP_Player::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	for (int i = 0; i < Projectiles.Num(); i++)
+	{
+		Projectiles[i]->RemoveFromRoot();
+	}
+	Projectiles.Empty();
+	Super::EndPlay(EndPlayReason);
+}
+
+void ANP_Player::JumpReleased_Implementation()
+{
+
+}
+
+void ANP_Player::Look_Implementation(float Value)
+{
+	AddControllerPitchInput(Value);
+}
+
+void ANP_Player::Turn_Implementation(float Value)
+{
+	AddControllerYawInput(Value);
+}
+
+void ANP_Player::MoveRight_Implementation(float value)
+{
+	MovementInput.Y = value;
+}
+
+void ANP_Player::MoveForward_Implementation(float value)
+{
+	MovementInput.X = value;
+}
+
+void ANP_Player::FireButtonReleased_Implementation()
+{
+	auto FacingRotation = GetControlRotation();
+	Server_FireProjectile(counter, FirePosition->GetComponentLocation(), FacingRotation);
+	counter++;
+	if (counter >= 10)
+	{
+		counter = 0;
+	}
+
+	////if (ProjectilePool->HasFreeObject())
+//{
+////	ANPBaseProjectile* BaseProjectile = (ANPBaseProjectile*)ProjectilePool->GetPooledObject();
+////	Server_FireProjectile(BaseProjectile->Index, GetActorLocation(), GetControlRotation());
+//}
+////else
+//{
+////	ShootingComponent->StopCharging();
+//}
+///*if (GetLocalRole() >= ROLE_AutonomousProxy)
+//{*/
+//	//if (HasAuthority())
+//	//{
+//		
+//	//}
+//	//else
+//	//{
+//	//	if (ProjectilePool->HasFreeObject())
+//	//	{
+//	//		ANPBaseProjectile* BaseProjectile = (ANPBaseProjectile*)ProjectilePool->GetPooledObject();
+//	//		//start moving
+//	//		//And then correct position later
+//	//		Server_FireProjectile(BaseProjectile, FirePosition->GetComponentLocation(), GetControlRotation());
+//	//	}
+//	//	else
+//	//	{
+//	//		ShootingComponent->StopCharging();
+//	//	}
+//	//}
+//	//
+////}
+}
+
+void ANP_Player::FireButtonPressed_Implementation()
+{
+	Server_StartCharging();
+	ShootingComponent->StartCharging();
+}
+
+void ANP_Player::JumpPressed_Implementation()
+{
+	if (MovementComponent->CanJump())
+	{
+		MovementComponent->Jump();
+	}
+}
+
 bool ANP_Player::CanDamage_Implementation() const
 {
 	return true;
 }
 
-void ANP_Player::ReceiveDamage_Implementation(float Damage, ANP_Player* _Instigator)
+FDamageResult ANP_Player::ReceiveDamage_Implementation(float Damage, AActor* _Instigator)
 {
-	if (HealthComponent->ReceiveDamage(Damage))
+	FDamageResult DamageResult = FDamageResult();
+	//calculate mitigation etc.
+	DamageResult.HealthDamageDealt = Damage;
+	if (IDamageableInterface::Execute_CanDamage(this))
 	{
-		//We died
+		//calculate actual damage dealt
+
+		GEngine->AddOnScreenDebugMessage(INDEX_NONE, 1.0f, FColor::Cyan, "Ouch oof owwie!");
+		if (!HealthComponent->ReceiveDamage(Damage))
+		{
+			//We died
+		}
 	}
+	return DamageResult;
 }
 
-void ANP_Player::BeginPlay()
-{
-	Super::BeginPlay();
-	for (int i = 0; i < 10; i++)
-	{
-		Projectiles[i]->SetStaticMesh(ProjectileMesh);
-	}
-}
 
