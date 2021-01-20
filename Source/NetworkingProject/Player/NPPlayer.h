@@ -8,14 +8,28 @@
 #include "../Components/NPAmmoComponent.h"
 #include "../Interfaces/DamageableInterface.h"
 #include "../Interfaces/PlayerControlInterface.h"
+#include "../Projectile/NPArrowProjectile.h"
+#include "Camera/CameraComponent.h"
+#include "../Interfaces/PickupInterface.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "NPPlayer.generated.h"
 
 class UNPMovementComponent;
 class UCapsuleComponent;
 class USkeletalMeshComponent;
 
+UENUM(BlueprintType)
+enum ENPArmState
+{
+	EAS_Idle,
+	EAS_Draw,
+	EAS_Shoot,
+	EAS_Climbing,
+	EAS_Dash
+};
+
 UCLASS(Blueprintable, BlueprintType)
-class NETWORKINGPROJECT_API ANP_Player : public APawn, public IDamageableInterface, public IPlayerControlInterface
+class NETWORKINGPROJECT_API ANP_Player : public APawn, public IDamageableInterface, public IPickupInterface, public IPlayerControlInterface
 {
 	GENERATED_BODY()
 
@@ -45,36 +59,43 @@ public:
 	UFUNCTION(BlueprintPure)
 	int32 GetPing() const;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Movement)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Camera)
+	UCameraComponent* FPSCamera;
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Camera)
+	UCameraComponent* ThirdPersonCamera;
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Camera)
+	USpringArmComponent* ThirdPersonSpringArm;
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Movement)
 	UNPMovementComponent* MovementComponent;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Mesh)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Mesh)
 	USkeletalMeshComponent* Mesh;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Mesh)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Mesh)
 	USkeletalMeshComponent* FPMesh;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Shooting)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Shooting)
 	UNPShootingComponent* ShootingComponent;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Shooting)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Shooting)
 	UNPAmmoComponent* AmmoComponent;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Collision)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Collision)
 	UCapsuleComponent* CapsuleComponent;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Health)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Health)
 	UNPHealthComponent* HealthComponent;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Shooting)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = Shooting)
 	USceneComponent* FirePosition;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Shooting)
 	UStaticMesh* ProjectileMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Shooting)
-	TArray<UNPBaseProjectile*> Projectiles;
+	TArray<UNPArrowProjectile*> Arrows;
 
 	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	FDamageResult ReceiveDamage_Implementation(float Damage, AActor* Instigator) override;
 	bool CanDamage_Implementation() const override;
 
-	void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	//Player Control Interface
 	void JumpPressed_Implementation() override;
@@ -86,6 +107,9 @@ public:
 	void Look_Implementation(float value) override;
 	void JumpReleased_Implementation() override;
 
+	bool CanPickup_Implementation(const FNPAmmoPickupData& AmmoData) override;
+	void ReceivePickup_Implementation(const FNPAmmoPickupData& AmmoData) override;
+
 protected:
 	void BeginPlay() override;
 
@@ -93,6 +117,9 @@ protected:
 private:
 	FVector MovementInput;
 	FVector TargetLocation;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, meta = (AllowPrivateAccess = "true"), Category = Shooting)
+	TEnumAsByte<ENPAmmoTypes> SelectedAmmoType;
 
 	UPROPERTY(Replicated)
 	FRotator ReplicatedRotation;
@@ -108,6 +135,7 @@ private:
 	const float RotationInterpolationSpeed = 5.0f;
 	const float MinDistance = 1.0f;
 
-
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
+	int32 NumberOfArrowInstances;
 	int counter = 0;
 };

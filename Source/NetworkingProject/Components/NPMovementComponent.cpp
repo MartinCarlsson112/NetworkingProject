@@ -79,7 +79,7 @@ void UNPMovementComponent::Move(FNPMovementData& FrameMovement)
 	}
 	else 
 	{
-		MovementState = EMS_InAir;
+		MovementState = EMS_Falling;
 		GEngine->AddOnScreenDebugMessage(2, 0.05f, FColor::Emerald, "Not Grounded");
 	}
 

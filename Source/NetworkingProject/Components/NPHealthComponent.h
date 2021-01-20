@@ -2,7 +2,7 @@
 #include "CoreMinimal.h"
 #include "NPHealthComponent.generated.h"
 
-UCLASS(Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType, meta = (BlueprintSpawnableComponent))
 class NETWORKINGPROJECT_API UNPHealthComponent : public UActorComponent
 {
 	GENERATED_BODY()

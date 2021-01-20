@@ -5,7 +5,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FShootingDelegate);
 
-UCLASS(Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType, meta = (BlueprintSpawnableComponent))
 class NETWORKINGPROJECT_API UNPShootingComponent : public UActorComponent
 {
 	GENERATED_BODY()

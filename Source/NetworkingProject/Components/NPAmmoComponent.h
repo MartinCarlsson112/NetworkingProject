@@ -1,35 +1,47 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "../Projectile/NPBaseProjectile.h"
+#include "../Projectile/NPAmmoData.h"
 #include "NPAmmoComponent.generated.h"
-
-
 
 USTRUCT(Blueprintable, BlueprintType)
 struct FAmmoContainer
 {
 	GENERATED_BODY()
 
-	uint32 Count;
-	uint32 MaxCount;
+	FAmmoContainer()
+	{
+		Count = 0;
+		MaxCount = 0;
+	}
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 Count;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 MaxCount;
 };
 
-UCLASS(Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType, meta = (BlueprintSpawnableComponent))
 class NETWORKINGPROJECT_API UNPAmmoComponent : public UActorComponent
 {
 	GENERATED_BODY()
 public:
+	UNPAmmoComponent();
 
-	void AddAmmoContainer(TSubclassOf<UNPBaseProjectile> Type, uint32 MaxAmmo, uint32 CurrentAmmo);
+	UFUNCTION(BlueprintCallable)
+	int32 GetAmmoCount(ENPAmmoTypes Type) const;
+	UFUNCTION(BlueprintCallable)
+	bool CanGainAmmo(ENPAmmoTypes Type) const;
+	UFUNCTION(BlueprintCallable)
+	bool UseAmmo(ENPAmmoTypes Type, int32 Count = 1);
+	UFUNCTION(BlueprintCallable)
+	bool GainAmmo(ENPAmmoTypes Type, int32 Count = 1);
 
-	bool HasAmmo(TSubclassOf<UNPBaseProjectile> Type, uint32 Count = 1) const;
-
-	uint32 GetAmmoCount(TSubclassOf<UNPBaseProjectile> Type) const;
-
-	void UseAmmo(TSubclassOf<UNPBaseProjectile> Type, uint32 Count = 1);
-
-	void GainAmmo(TSubclassOf<UNPBaseProjectile> Type, uint32 Count = 1);
+	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
-	TMap<TSubclassOf<UNPBaseProjectile>, FAmmoContainer> AmmoMap;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated, meta = (AllowPrivateAccess = "true"))
+	TArray<FAmmoContainer> Ammo;
 };

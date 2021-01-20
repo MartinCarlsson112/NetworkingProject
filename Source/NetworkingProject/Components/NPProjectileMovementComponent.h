@@ -4,7 +4,7 @@
 #include "NPProjectileMovementComponent.generated.h"
 
 
-UCLASS(Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType, meta = (BlueprintSpawnableComponent))
 class NETWORKINGPROJECT_API UNPProjectileMovementComponent : public UActorComponent
 {
 	GENERATED_BODY()

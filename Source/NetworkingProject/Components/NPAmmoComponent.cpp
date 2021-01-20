@@ -1,60 +1,49 @@
 #include "NPAmmoComponent.h"
+#include "Net/UnrealNetwork.h"
 
-void UNPAmmoComponent::AddAmmoContainer(TSubclassOf<UNPBaseProjectile> Type, uint32 MaxAmmo, uint32 CurrentAmmo)
+UNPAmmoComponent::UNPAmmoComponent()
 {
-	FAmmoContainer AmmoContainer;
-	AmmoContainer.Count = CurrentAmmo;
-	AmmoContainer.MaxCount = MaxAmmo;
-	AmmoMap.Emplace(Type, AmmoContainer);
+	Ammo.SetNum((int32)ENPAmmoTypes::COUNT);
 }
 
-bool UNPAmmoComponent::HasAmmo(TSubclassOf<UNPBaseProjectile> Type, uint32 Count /*= 1*/) const
+int32 UNPAmmoComponent::GetAmmoCount(ENPAmmoTypes Type) const
 {
-	if (AmmoMap.Contains(Type))
-	{
-		auto AmmoContainer = AmmoMap.Find(Type);
+	return Ammo[(int32)Type].Count;
+}
 
-		if (AmmoContainer->Count >= Count)
+bool UNPAmmoComponent::CanGainAmmo(ENPAmmoTypes Type) const
+{
+	return Ammo[(int32)Type].Count < Ammo[(int32)Type].MaxCount;
+}
+
+bool UNPAmmoComponent::UseAmmo(ENPAmmoTypes Type, int32 Count /*= 1*/)
+{
+	if (Count > 0)
+	{
+		if (Ammo[(int32)Type].Count - Count > 0)
 		{
+			Ammo[(int32)Type].Count -= Count;
 			return true;
 		}
-
 	}
 	return false;
 }
 
-uint32 UNPAmmoComponent::GetAmmoCount(TSubclassOf<UNPBaseProjectile> Type) const
+bool UNPAmmoComponent::GainAmmo(ENPAmmoTypes Type, int32 Count /*= 1*/)
 {
-	if (AmmoMap.Contains(Type))
+	if (Count > 0)
 	{
-		auto AmmoContainer = AmmoMap.Find(Type);
-		return AmmoContainer->Count;
-	}
-	return 0;
-}
-
-void UNPAmmoComponent::UseAmmo(TSubclassOf<UNPBaseProjectile> Type, uint32 Count /*= 1*/)
-{
-	if (AmmoMap.Contains(Type))
-	{
-		auto AmmoContainer = AmmoMap.Find(Type);
-
-		if (AmmoContainer->Count >= Count)
+		if (CanGainAmmo(Type))
 		{
-			AmmoContainer->Count -= Count;
+			Ammo[(int32)Type].Count = FMath::Clamp<int>(Ammo[(int32)Type].Count + Count, 0, Ammo[(int32)Type].MaxCount);
+			return true;
 		}
 	}
+	return false;
 }
 
-void UNPAmmoComponent::GainAmmo(TSubclassOf<UNPBaseProjectile> Type, uint32 Count /*= 1*/)
+void UNPAmmoComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	if (AmmoMap.Contains(Type))
-	{
-		auto AmmoContainer = AmmoMap.Find(Type);
-
-		if (AmmoContainer->Count >= Count)
-		{
-			AmmoContainer->Count += Count;
-		}
-	}
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UNPAmmoComponent, Ammo);
 }

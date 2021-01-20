@@ -15,9 +15,9 @@ public:
 	virtual void Fire(const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier);
 
 
-	void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
 	virtual void ActivateArrow();
 	virtual void DeactivateArrow();
+
+
 private:
 };

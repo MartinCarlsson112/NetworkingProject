@@ -18,6 +18,8 @@ void UNPArrowProjectile::Fire(const FVector& StartPosition, const FRotator& Dire
 	SetWorldRotation(Direction);
 	CurrentVelocity = Direction.Vector() * Power;
 	ActivateArrow();
+	SetActiveFlag(true); 
+	SetComponentTickEnabled(true);
 	GetWorld()->GetTimerManager().SetTimer(LifetimeTimerHandle, this, &UNPArrowProjectile::Expire, ArrowLifetime, false);
 }
 
@@ -27,30 +29,31 @@ void UNPArrowProjectile::OnCollision(class UPrimitiveComponent* OverlapComponent
 	if (GetOwner() == OtherActor)
 	{
 		return;
-	}
-
+	}		
 	if (GetOwner()->GetLocalRole() == ROLE_Authority)
 	{
-		GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.1f, FColor::Blue, "Collided");
-
 		if (OtherActor->GetClass()->ImplementsInterface(UDamageableInterface::StaticClass()))
 		{
-			IDamageableInterface::Execute_ReceiveDamage(OtherActor, ArrowDamage, GetOwner());
+			if (IDamageableInterface::Execute_CanDamage(OtherActor))
+			{
+				IDamageableInterface::Execute_ReceiveDamage(OtherActor, ArrowDamage, GetOwner());
+			}
 		}
-	}
-	//predict health change
+		//predict health change on client
+		CurrentVelocity = FVector::ZeroVector;
+		//Disable Collisions
+		SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		//Disable movement
+		SetComponentTickEnabled(false);
+		SetActiveFlag(false);
 
-	//Disable Collisions
-	SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	//Disable movement
-	SetComponentTickEnabled(false);
-
-	//Start timer for arrow to expire after hitting a target
-	if (GetWorld()->GetTimerManager().IsTimerActive(LifetimeTimerHandle))
-	{
-		GetWorld()->GetTimerManager().ClearTimer(LifetimeTimerHandle);
+		//Start timer for arrow to expire after hitting a target
+		if (GetWorld()->GetTimerManager().IsTimerActive(LifetimeTimerHandle))
+		{
+			GetWorld()->GetTimerManager().ClearTimer(LifetimeTimerHandle);
+		}
+		GetWorld()->GetTimerManager().SetTimer(LifetimeTimerHandle, this, &UNPArrowProjectile::Expire, ArrowHitLifetime, false);
 	}
-	GetWorld()->GetTimerManager().SetTimer(LifetimeTimerHandle, this, &UNPArrowProjectile::Expire, ArrowHitLifetime, false);
 }
 
 void UNPArrowProjectile::Expire()
@@ -78,16 +81,17 @@ void UNPArrowProjectile::TickComponent(float DeltaTime, enum ELevelTick TickType
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	auto DeltaVelocity = DeltaTime * CurrentVelocity;
-	auto DeltaGravity = (FVector(0, 0, -9.81f));
+	if (GetOwner()->GetLocalRole() == ROLE_Authority)
+	{
+		auto DeltaVelocity = DeltaTime * CurrentVelocity;
+		auto DeltaGravity = (FVector(0, 0, -9.81f));
 
-	auto MovementVector = DeltaVelocity + DeltaGravity;
-	SetWorldLocation(GetComponentLocation() + DeltaVelocity + DeltaGravity);
-	CurrentVelocity = CurrentVelocity + DeltaGravity;
+		auto MovementVector = DeltaVelocity + DeltaGravity;
+		SetWorldLocation(GetComponentLocation() + DeltaVelocity + DeltaGravity);
+		CurrentVelocity = CurrentVelocity + DeltaGravity;
 
-	SetWorldRotation(MovementVector.ToOrientationRotator());
-
-	GEngine->AddOnScreenDebugMessage(INDEX_NONE, DeltaTime, FColor::Blue, GetComponentLocation().ToString());
+		SetWorldRotation(MovementVector.ToOrientationRotator());
+	}
 }
 
 void UNPArrowProjectile::SetTeam(int _TeamIndex)

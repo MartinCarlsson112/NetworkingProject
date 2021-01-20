@@ -4,7 +4,6 @@
 #include "Engine/CollisionProfile.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "../Projectile/NPBaseProjectile.h"
 #include "../Projectile/NPArrowProjectile.h"
 
 ANP_Player::ANP_Player()
@@ -12,9 +11,7 @@ ANP_Player::ANP_Player()
 	PrimaryActorTick.bCanEverTick = true;
 	SetReplicateMovement(false);
 
-	MovementComponent = CreateDefaultSubobject<UNPMovementComponent>(TEXT("MovementComponent v"));
-
-	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComponent v"));
+	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComponent"));
 	CapsuleComponent->InitCapsuleSize(34.0f, 88.0f);
 	CapsuleComponent->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
 
@@ -24,7 +21,8 @@ ANP_Player::ANP_Player()
 	CapsuleComponent->bDynamicObstacle = true;
 	RootComponent = CapsuleComponent;
 
-	Mesh = CreateOptionalDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMeshComponent v"));
+
+	Mesh = CreateOptionalDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMeshComponent"));
 	if (Mesh)
 	{
 		Mesh->AlwaysLoadOnClient = true;
@@ -34,14 +32,16 @@ ANP_Player::ANP_Player()
 		Mesh->bCastDynamicShadow = true;
 		Mesh->bAffectDynamicIndirectLighting = true;
 		Mesh->PrimaryComponentTick.TickGroup = TG_PrePhysics;
-		Mesh->SetupAttachment(CapsuleComponent);
+		Mesh->SetupAttachment(RootComponent);
 		static FName MeshCollisionProfileName(TEXT("CharacterMesh"));
 		Mesh->SetCollisionProfileName(MeshCollisionProfileName);
 		Mesh->SetGenerateOverlapEvents(false);
 		Mesh->SetCanEverAffectNavigation(false);
 	}
 
-	FPMesh = CreateOptionalDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonMesh v"));
+	FPSCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FPSCamera"));
+	FPSCamera->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+	FPMesh = CreateOptionalDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonMesh"));
 	if (FPMesh)
 	{
 		FPMesh->AlwaysLoadOnClient = true;
@@ -52,43 +52,60 @@ ANP_Player::ANP_Player()
 		FPMesh->bCastDynamicShadow = true;
 		FPMesh->bAffectDynamicIndirectLighting = true;
 		FPMesh->PrimaryComponentTick.TickGroup = TG_PrePhysics;
-		FPMesh->SetupAttachment(CapsuleComponent);
+		FPMesh->SetupAttachment(FPSCamera);
 		static FName MeshCollisionProfileName(TEXT("NoCollision"));
 		FPMesh->SetCollisionProfileName(MeshCollisionProfileName);
 		FPMesh->SetGenerateOverlapEvents(false);
 		FPMesh->SetCanEverAffectNavigation(false);
 	}
-	FirePosition = CreateDefaultSubobject<USceneComponent>(TEXT("FirePosition v"));
-	FirePosition->AttachToComponent(CapsuleComponent, FAttachmentTransformRules::KeepRelativeTransform);
+	FirePosition = CreateDefaultSubobject<USceneComponent>(TEXT("FirePosition"));
+	FirePosition->AttachToComponent(FPMesh, FAttachmentTransformRules::KeepRelativeTransform);
 
-	ShootingComponent = CreateDefaultSubobject<UNPShootingComponent>(TEXT("ShootingComponent v"));
+	ThirdPersonSpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("ThirdPersonSpringArm"));
+	ThirdPersonSpringArm->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+	ThirdPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("ThirdPersonCamera"));
+	ThirdPersonCamera->AttachToComponent(ThirdPersonSpringArm, FAttachmentTransformRules::KeepRelativeTransform);
 
-	AmmoComponent = CreateDefaultSubobject<UNPAmmoComponent>(TEXT("AmmoComponent v"));
-	AmmoComponent->AddAmmoContainer(UNPArrowProjectile::StaticClass(), 30, 30);
+	ShootingComponent = CreateDefaultSubobject<UNPShootingComponent>(TEXT("ShootingComponent"));
+	AmmoComponent = CreateDefaultSubobject<UNPAmmoComponent>(TEXT("AmmoComponent"));
+	HealthComponent = CreateDefaultSubobject<UNPHealthComponent>(TEXT("HealthComponent"));
+	MovementComponent = CreateDefaultSubobject<UNPMovementComponent>(TEXT("MovementComponent"));
 
-	HealthComponent = CreateDefaultSubobject<UNPHealthComponent>(TEXT("HealthComponent v"));
-
-	Projectiles.SetNum(10);
-	for (int i = 0; i < Projectiles.Num(); i++)
+	const FName ProjectileNames[] = {
+		TEXT("Projectile_1"),
+		TEXT("Projectile_2"),
+		TEXT("Projectile_3"),
+		TEXT("Projectile_4"),
+		TEXT("Projectile_5"),
+		TEXT("Projectile_6"),
+		TEXT("Projectile_7"),
+		TEXT("Projectile_8"),
+		TEXT("Projectile_9"),
+		TEXT("Projectile_0"),
+	};
+	Arrows.Empty();
+	for (int i = 0; i < 10; i++)
 	{
-		Projectiles[i] = CreateDefaultSubobject<UNPArrowProjectile>(TEXT("Projectiles V " + i));
-		Projectiles[i]->AddToRoot();
-
+		auto Arrow = CreateDefaultSubobject<UNPArrowProjectile>(ProjectileNames[i]);
+		Arrow->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+		Arrow->SetIsReplicated(true);
+		Arrows.Add(Arrow);
 	}
-	MovementSpeed = 500.0f;
 
+	MovementSpeed = 500.0f;
 	ArrowForce = 2000.0f;
+	NumberOfArrowInstances = 10;
 	MovementInput = FVector::ZeroVector;
 	TargetLocation = GetActorLocation();
-
 }
 
 void ANP_Player::BeginPlay()
 {
-	Super::BeginPlay();
-	for (int i = 0; i < Projectiles.Num(); i++)
+	Super::BeginPlay();		
+	ensure(ProjectileMesh != nullptr);
+	for (int i = 0; i < Arrows.Num(); i++)
 	{
-		Projectiles[i]->SetStaticMesh(ProjectileMesh);
+		Arrows[i]->SetStaticMesh(ProjectileMesh);
 	}
 }
 
@@ -110,7 +127,6 @@ void ANP_Player::Tick(float DeltaSeconds)
 		Server_SendMove(GetActorLocation());
 		Server_SendRotation(GetActorRotation());
 	}
-
 	else
 	{
 		if (!TargetLocation.Equals(GetActorLocation()))
@@ -131,7 +147,6 @@ void ANP_Player::Tick(float DeltaSeconds)
 			SetActorRotation(NewRot);
 		}
 	}
-
 }
 
 void ANP_Player::Server_SendMove_Implementation(const FVector& NewLocation)
@@ -153,20 +168,18 @@ void ANP_Player::Server_SendRotation_Implementation(const FRotator& NewRotation)
 	ReplicatedRotation = NewRotation;
 }
 
-
-
 void ANP_Player::Server_FireProjectile_Implementation(int ProjectileToShoot, const FVector& ArrowStartPosition, const FRotator& FacingRotation)
 {
-	Multicast_FireProjectile(ProjectileToShoot, ArrowStartPosition, FacingRotation);
+	if (AmmoComponent->UseAmmo(SelectedAmmoType))
+	{
+		Multicast_FireProjectile(ProjectileToShoot, ArrowStartPosition, FacingRotation);
+	}
 }
 
 void ANP_Player::Multicast_FireProjectile_Implementation(int ProjectileToShoot, const FVector& ArrowStartPosition, const FRotator& FacingRotation)
 {
 	if (!ensure(ProjectileToShoot != -1))
 		return;
-
-	//float ChargeAmount = ShootingComponent->Fire();
-	//ProjectileToShoot->Fire(this, GetControlRotation().Vector(), ChargeAmount * ArrowForce, ArrowDamageMultiplier);
 
 	//if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
@@ -175,14 +188,16 @@ void ANP_Player::Multicast_FireProjectile_Implementation(int ProjectileToShoot, 
 	//else
 	{
 		float ChargeAmount = ShootingComponent->Fire();
-		Projectiles[ProjectileToShoot]->Fire(ArrowStartPosition, FacingRotation, ChargeAmount * ArrowForce , ArrowDamageMultiplier);
-		//((ANPBaseProjectile*)ProjectilePool->Pool[ProjectileToShoot])->Fire(this, ArrowStartPosition, FacingRotation, ChargeAmount * ArrowForce, ArrowDamageMultiplier);
+		Arrows[ProjectileToShoot]->Fire(ArrowStartPosition, FacingRotation, ChargeAmount * ArrowForce , ArrowDamageMultiplier);
 	}
 }
 
 void ANP_Player::Server_StartCharging_Implementation()
 {
-	ShootingComponent->StartCharging();
+	if (AmmoComponent->GetAmmoCount(SelectedAmmoType) > 0)
+	{
+		ShootingComponent->StartCharging();
+	}
 }
 
 int32 ANP_Player::GetPing() const
@@ -202,20 +217,20 @@ void ANP_Player::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(ANP_Player, ReplicatedRotation);
 }
 
-void ANP_Player::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void ANP_Player::ReceivePickup_Implementation(const FNPAmmoPickupData& AmmoData)
 {
-	for (int i = 0; i < Projectiles.Num(); i++)
+	AmmoComponent->GainAmmo(AmmoData.AmmoType, AmmoData.Count);
+}
+
+bool ANP_Player::CanPickup_Implementation(const FNPAmmoPickupData& AmmoData)
+{
+	if (AmmoComponent->CanGainAmmo(AmmoData.AmmoType))
 	{
-		Projectiles[i]->RemoveFromRoot();
+		return true;
 	}
-	Projectiles.Empty();
-	Super::EndPlay(EndPlayReason);
+	return false;
 }
 
-void ANP_Player::JumpReleased_Implementation()
-{
-
-}
 
 void ANP_Player::Look_Implementation(float Value)
 {
@@ -242,48 +257,20 @@ void ANP_Player::FireButtonReleased_Implementation()
 	auto FacingRotation = GetControlRotation();
 	Server_FireProjectile(counter, FirePosition->GetComponentLocation(), FacingRotation);
 	counter++;
-	if (counter >= 10)
+	if (counter >= Arrows.Num())
 	{
 		counter = 0;
 	}
-
-	////if (ProjectilePool->HasFreeObject())
-//{
-////	ANPBaseProjectile* BaseProjectile = (ANPBaseProjectile*)ProjectilePool->GetPooledObject();
-////	Server_FireProjectile(BaseProjectile->Index, GetActorLocation(), GetControlRotation());
-//}
-////else
-//{
-////	ShootingComponent->StopCharging();
-//}
-///*if (GetLocalRole() >= ROLE_AutonomousProxy)
-//{*/
-//	//if (HasAuthority())
-//	//{
-//		
-//	//}
-//	//else
-//	//{
-//	//	if (ProjectilePool->HasFreeObject())
-//	//	{
-//	//		ANPBaseProjectile* BaseProjectile = (ANPBaseProjectile*)ProjectilePool->GetPooledObject();
-//	//		//start moving
-//	//		//And then correct position later
-//	//		Server_FireProjectile(BaseProjectile, FirePosition->GetComponentLocation(), GetControlRotation());
-//	//	}
-//	//	else
-//	//	{
-//	//		ShootingComponent->StopCharging();
-//	//	}
-//	//}
-//	//
-////}
 }
 
 void ANP_Player::FireButtonPressed_Implementation()
 {
 	Server_StartCharging();
-	ShootingComponent->StartCharging();
+
+	if (AmmoComponent->GetAmmoCount(SelectedAmmoType) > 0)
+	{
+		ShootingComponent->StartCharging();
+	}
 }
 
 void ANP_Player::JumpPressed_Implementation()
@@ -294,8 +281,14 @@ void ANP_Player::JumpPressed_Implementation()
 	}
 }
 
+void ANP_Player::JumpReleased_Implementation()
+{
+
+}
+
 bool ANP_Player::CanDamage_Implementation() const
 {
+	//For example if target is not supposed to be hittable etc.
 	return true;
 }
 
@@ -304,15 +297,9 @@ FDamageResult ANP_Player::ReceiveDamage_Implementation(float Damage, AActor* _In
 	FDamageResult DamageResult = FDamageResult();
 	//calculate mitigation etc.
 	DamageResult.HealthDamageDealt = Damage;
-	if (IDamageableInterface::Execute_CanDamage(this))
+	if (!HealthComponent->ReceiveDamage(Damage))
 	{
-		//calculate actual damage dealt
-
-		GEngine->AddOnScreenDebugMessage(INDEX_NONE, 1.0f, FColor::Cyan, "Ouch oof owwie!");
-		if (!HealthComponent->ReceiveDamage(Damage))
-		{
-			//We died
-		}
+		//We died
 	}
 	return DamageResult;
 }

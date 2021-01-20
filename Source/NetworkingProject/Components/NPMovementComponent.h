@@ -9,12 +9,17 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMovementStateDelegate);
 UENUM(BlueprintType)
 enum EMovementState
 {
+	EMS_Idle,
+	EMS_Running,
+	EMS_Climbing,
+	EMS_Dashing,
 	EMS_Grounded,
-	EMS_InAir,
+	EMS_Jumping,
+	EMS_Falling,
 	EMS_Disabled
 };
 
-UCLASS(Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType, meta = (BlueprintSpawnableComponent))
 class NETWORKINGPROJECT_API UNPMovementComponent : public UMovementComponent
 {
 	GENERATED_BODY()

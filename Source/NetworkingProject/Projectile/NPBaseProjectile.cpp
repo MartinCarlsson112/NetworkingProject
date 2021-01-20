@@ -3,20 +3,12 @@
 UNPBaseProjectile::UNPBaseProjectile()
 {
 	SetIsReplicatedByDefault(true);
+	SetAbsolute(true, true);
 }
 
 void UNPBaseProjectile::Fire(const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier)
 {
 
-}
-
-void UNPBaseProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	if (IsRooted())
-	{
-		RemoveFromRoot();
-	}
-	Super::EndPlay(EndPlayReason);
 }
 
 void UNPBaseProjectile::ActivateArrow()
