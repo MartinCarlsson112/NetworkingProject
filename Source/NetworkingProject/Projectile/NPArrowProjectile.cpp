@@ -7,6 +7,7 @@ UNPArrowProjectile::UNPArrowProjectile()
 	PrimaryComponentTick.bCanEverTick = true;
 	ArrowLifetime = 15.0f;
 	ArrowHitLifetime = 10.0f;
+	ArrowDamage = 25.0f;
 	SetIsReplicatedByDefault(true);
 	SetComponentTickEnabled(false);
 	SetNotifyRigidBodyCollision(false);
@@ -22,7 +23,7 @@ void UNPArrowProjectile::Fire(const FVector& StartPosition, const FRotator& Dire
 	SetWorldRotation(Direction);
 	SetWorldLocation(StartPosition);
 	LastPosition = StartPosition;
-	TargetLocation = StartPosition + CurrentVelocity;
+	TargetLocation = StartPosition + CurrentVelocity * 0.06f;
 	
 	if (GetOwner()->GetLocalRole() == ROLE_Authority)
 	{

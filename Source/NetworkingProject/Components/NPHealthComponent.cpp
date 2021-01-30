@@ -1,5 +1,5 @@
 #include "NPHealthComponent.h"
-
+#include "Net/UnrealNetwork.h"
 UNPHealthComponent::UNPHealthComponent()
 {
 	MaxHealth = 100;
@@ -26,5 +26,11 @@ void UNPHealthComponent::ReceiveHealing(int Amount)
 int UNPHealthComponent::GetCurrentHealth()
 {
 	return Health;
+}
+
+void UNPHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UNPHealthComponent, Health);
 }
 

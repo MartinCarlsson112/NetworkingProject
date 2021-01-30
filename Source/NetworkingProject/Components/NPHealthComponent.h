@@ -18,8 +18,13 @@ public:
 	UFUNCTION(BlueprintCallable)
 	int GetCurrentHealth();
 
-private:
 
+	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+private:
+	UPROPERTY(Replicated)
 	int MaxHealth;
+
+	UPROPERTY(Replicated)
 	int Health;
 };
