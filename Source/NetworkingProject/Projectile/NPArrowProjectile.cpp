@@ -23,8 +23,13 @@ void UNPArrowProjectile::Fire(const FVector& StartPosition, const FRotator& Dire
 	SetWorldRotation(Direction);
 	SetWorldLocation(StartPosition);
 	LastPosition = StartPosition;
-	TargetLocation = StartPosition + CurrentVelocity * 0.06f;
-	
+
+	auto DeltaGravity = (FVector(0, 0, -981.f * GetWorld()->GetDeltaSeconds()));
+	auto DeltaVelocity = GetWorld()->GetDeltaSeconds() * CurrentVelocity + DeltaGravity;
+
+	auto MovementVector = (DeltaVelocity + DeltaGravity) * 60;
+	CurrentPosition = StartPosition;
+
 	if (GetOwner()->GetLocalRole() == ROLE_Authority)
 	{
 		GetWorld()->GetTimerManager().SetTimer(LifetimeTimerHandle, this, &UNPArrowProjectile::Expire, ArrowLifetime, false);
@@ -86,14 +91,15 @@ void UNPArrowProjectile::TickComponent(float DeltaTime, enum ELevelTick TickType
 
 	if (GetOwner()->GetLocalRole() == ROLE_Authority)
 	{
-		auto DeltaVelocity = DeltaTime * CurrentVelocity;
-		auto DeltaGravity = (FVector(0, 0, -9.81f));
+		auto DeltaGravity = (FVector(0, 0, -581.f *  DeltaTime));
+		auto DeltaVelocity = DeltaTime * CurrentVelocity + DeltaGravity;
+	
 
-		auto MovementVector = DeltaVelocity + DeltaGravity;
+		auto MovementVector = DeltaVelocity;
 
 
 		//DrawDebugLine(GetWorld(), GetComponentLocation(), GetComponentLocation() + DeltaVelocity + DeltaGravity, FColor::Red, false, 1.0f);
-		SetWorldLocation(GetComponentLocation() + DeltaVelocity + DeltaGravity);
+		SetWorldLocation(GetComponentLocation() + MovementVector);
 
 		CurrentVelocity = CurrentVelocity + DeltaGravity;
 
@@ -101,10 +107,22 @@ void UNPArrowProjectile::TickComponent(float DeltaTime, enum ELevelTick TickType
 
 		TargetLocation = GetComponentLocation();
 	}
+	else if (GetOwner()->GetLocalRole() == ROLE_AutonomousProxy)
+	{
+		auto DeltaGravity = (FVector(0, 0, -581.f * DeltaTime));
+		auto DeltaVelocity = DeltaTime * CurrentVelocity + DeltaGravity;
+		auto MovementVector = DeltaVelocity;
+		//DrawDebugLine(GetWorld(), GetComponentLocation(), GetComponentLocation() + DeltaVelocity + DeltaGravity, FColor::Red, false, 1.0f);
+		SetWorldLocation(CurrentPosition + MovementVector);
+		CurrentPosition = GetComponentLocation();
+		CurrentVelocity = CurrentVelocity + DeltaGravity;
+		SetWorldRotation(MovementVector.ToOrientationRotator());
+	}
 	else
 	{
 		FVector InterpolatedPosition = FMath::VInterpTo(LastPosition, TargetLocation, DeltaTime, VInterpSpeed);
 		LastPosition = InterpolatedPosition;
+
 		SetWorldLocation(InterpolatedPosition);
 	}
 }

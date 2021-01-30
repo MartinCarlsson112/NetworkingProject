@@ -20,7 +20,7 @@ bool UNPAmmoComponent::UseAmmo(ENPAmmoTypes Type, int32 Count /*= 1*/)
 {
 	if (Count > 0)
 	{
-		if (Ammo[(int32)Type].Count - Count > 0)
+		if (Ammo[(int32)Type].Count - Count >= 0)
 		{
 			Ammo[(int32)Type].Count -= Count;
 			return true;

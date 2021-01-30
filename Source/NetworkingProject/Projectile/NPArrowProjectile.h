@@ -47,6 +47,7 @@ protected:
 	FVector InitialDirection;
 	FVector CurrentVelocity;
 	FVector LastPosition;
+	FVector CurrentPosition;
 	bool HasBeenFired;
 
 	UPROPERTY()

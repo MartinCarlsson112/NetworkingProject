@@ -274,14 +274,16 @@ void ANP_Player::FireButtonReleased_Implementation()
 
 	if (GetLocalRole() != ROLE_Authority)
 	{
-		float ChargeAmount = ShootingComponent->Fire();
-		Arrows[counter]->Fire(FirePosition->GetComponentLocation(), FacingRotation, ChargeAmount * ArrowForce, ArrowDamageMultiplier);
-	}
-
-	counter++;
-	if (counter >= Arrows.Num())
-	{
-		counter = 0;
+		if (AmmoComponent->GetAmmoCount(SelectedAmmoType) > 0)
+		{
+			float ChargeAmount = ShootingComponent->Fire();
+			Arrows[counter]->Fire(FirePosition->GetComponentLocation(), FacingRotation, ChargeAmount * ArrowForce, ArrowDamageMultiplier);
+			counter++;
+			if (counter >= Arrows.Num())
+			{
+				counter = 0;
+			}
+		}
 	}
 }
 

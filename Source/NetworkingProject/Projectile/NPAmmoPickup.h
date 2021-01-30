@@ -34,9 +34,13 @@ private:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = "Ammo")
 	FNPAmmoPickupData AmmoData;
 
-
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, meta = (AllowPrivateAccess = "true"), Category = "Ammo");
+	bool bUsed;
 
 public:
 	void BeginPlay() override;
+
+
+	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 };

@@ -21,13 +21,13 @@ void UNPBaseProjectile::ActivateProjectile()
 	SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	SetComponentTickEnabled(true);
 	SetGenerateOverlapEvents(true);
-	//SetHiddenInGame(false);
+	SetHiddenInGame(false);
 	SetActiveFlag(true);
 }
 
 void UNPBaseProjectile::DeactivateProjectile()
 {
-	//SetHiddenInGame(true);
+	SetHiddenInGame(true);
 	SetGenerateOverlapEvents(false);
 	SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SetComponentTickEnabled(false);
