@@ -78,7 +78,12 @@ int32 ANPPlayerController::GetAmmoCount() const
 
 int32 ANPPlayerController::GetCurrentHealth() const
 {
-	return 2;
+	auto TempPawn = GetPawn<ANP_Player>();
+	if (TempPawn)
+	{
+		return TempPawn->GetCurrentHealth();
+	}
+	return 0;
 }
 
 float ANPPlayerController::GetChargeTime() const

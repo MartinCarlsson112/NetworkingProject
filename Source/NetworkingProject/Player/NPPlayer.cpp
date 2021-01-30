@@ -168,6 +168,16 @@ int32 ANP_Player::GetAmmoCount() const
 	return AmmoComponent->GetAmmoCount(SelectedAmmoType);
 }
 
+int32 ANP_Player::GetCurrentHealth() const
+{
+	return HealthComponent->GetCurrentHealth();
+}
+
+float ANP_Player::GetCurrentCharge() const
+{
+	return 0;
+}
+
 int32 ANP_Player::GetPing() const
 {
 	auto State = GetPlayerState();
@@ -193,11 +203,7 @@ void ANP_Player::BeginPlay()
 	//The arrow array is not replicated, so we need to fill the array on client side.
 	if (GetLocalRole() != ROLE_Authority)
 	{
-		auto Comps =  GetComponentsByClass(UNPArrowProjectile::StaticClass());
-		for (int i = 0; i < Comps.Num(); i++)
-		{
-			Arrows.Add(Cast<UNPArrowProjectile>(Comps[i]));
-		}
+		GetComponents<UNPArrowProjectile>(Arrows);
 	}
 	TargetLocation = GetActorLocation();
 

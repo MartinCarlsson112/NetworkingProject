@@ -6,7 +6,7 @@ UNPHealthComponent::UNPHealthComponent()
 	Health = MaxHealth;
 }
 
-bool UNPHealthComponent::ReceiveDamage(float Amount)
+bool UNPHealthComponent::ReceiveDamage(int Amount)
 {
 	Health -= Amount;
 	Health = FMath::Clamp<float>(Health, 0, MaxHealth);
@@ -17,9 +17,14 @@ bool UNPHealthComponent::ReceiveDamage(float Amount)
 	return false;
 }
 
-void UNPHealthComponent::ReceiveHealing(float Amount)
+void UNPHealthComponent::ReceiveHealing(int Amount)
 {
 	Health += Amount;
 	Health = FMath::Clamp<float>(Health, 0, MaxHealth);
+}
+
+int UNPHealthComponent::GetCurrentHealth()
+{
+	return Health;
 }
 

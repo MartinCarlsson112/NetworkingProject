@@ -11,13 +11,15 @@ public:
 
 
 	UFUNCTION(BlueprintCallable)
-	bool ReceiveDamage(float Amount);
+	bool ReceiveDamage(int Amount);
 
 	UFUNCTION(BlueprintCallable)
-	void ReceiveHealing(float Amount);
+	void ReceiveHealing(int Amount);
+	UFUNCTION(BlueprintCallable)
+	int GetCurrentHealth();
 
 private:
 
-	float MaxHealth;
-	float Health;
+	int MaxHealth;
+	int Health;
 };
