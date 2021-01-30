@@ -20,10 +20,23 @@ void UNPAmmoPickup::OnOverlapBegin(class UPrimitiveComponent* OverlappedComp, cl
 			if (IPickupInterface::Execute_CanPickup(OtherActor, AmmoData))
 			{
 				IPickupInterface::Execute_ReceivePickup(OtherActor, AmmoData);
+				OnPickup.Broadcast();
+				DeactivatePickup();
 			}
-			OnPickup.Broadcast();
-			DeactivatePickup();
 		}
+	}
+	else
+	{
+		if (OtherActor->GetClass()->ImplementsInterface(UPickupInterface::StaticClass()))
+		{
+			if (IPickupInterface::Execute_CanPickup(OtherActor, AmmoData))
+			{
+				IPickupInterface::Execute_ReceivePickup(OtherActor, AmmoData);
+				SetVisibility(false, true);
+			}
+		}
+		
+		
 	}
 }
 
@@ -38,10 +51,12 @@ void UNPAmmoPickup::ActivatePickup()
 {
 	SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	SetGenerateOverlapEvents(true);
+	SetVisibility(true, true);
 }
 
 void UNPAmmoPickup::DeactivatePickup()
 {
 	SetGenerateOverlapEvents(false);
+	SetVisibility(false, true);
 	SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }

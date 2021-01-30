@@ -67,7 +67,7 @@ void UNPMovementComponent::UpdateMovement(float DeltaTime)
 
 	if (!FoundGround)
 	{
-		GravityVector = Gravity;
+		GravityVector += Gravity ;
 		Forward = GetOwner()->GetActorForwardVector();
 		MovementState = EMS_Falling;
 		GEngine->AddOnScreenDebugMessage(1, 0.1f, FColor::Blue, "Falling");
@@ -82,7 +82,9 @@ void UNPMovementComponent::UpdateMovement(float DeltaTime)
 	if (Jumping)
 	{
 		FHitResult WallClimbTraceHit;
-		auto WallClimbTraceStartLoc = UpdatedComponent->GetComponentLocation() + UpdatedComponent->GetForwardVector() * CapsuleComponent->GetScaledCapsuleRadius();
+		auto WallClimbTraceStartLoc = UpdatedComponent->GetComponentLocation() + 
+			UpdatedComponent->GetForwardVector() * CapsuleComponent->GetScaledCapsuleRadius() - 
+			FVector(0, 0, CapsuleComponent->GetScaledCapsuleHalfHeight());
 		if (GetWorld()->LineTraceSingleByChannel(
 		WallClimbTraceHit, 
 		WallClimbTraceStartLoc,
@@ -90,7 +92,7 @@ void UNPMovementComponent::UpdateMovement(float DeltaTime)
 		ECC_WorldDynamic, 
 		QueryParams))
 		{
-			LaunchCharacter(FVector(0, 0, 10), false, true);
+			LaunchCharacter(FVector(0, 0, 15), false, true);
 		}
 	}
 }

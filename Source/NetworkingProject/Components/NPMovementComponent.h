@@ -41,7 +41,7 @@ public:
 
 	FVector InputVector;
 	FVector Velocity;
-	FVector Gravity = FVector(0, 0, -981.0f);
+	FVector Gravity = FVector(0, 0, -20.f);
 	FVector GravityVector;
 	TArray<struct FHitResult> CollisionResults; 
 	TArray<struct FHitResult> GroundCheckResults;
