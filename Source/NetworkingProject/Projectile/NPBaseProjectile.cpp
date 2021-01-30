@@ -11,18 +11,25 @@ void UNPBaseProjectile::Fire(const FVector& StartPosition, const FRotator& Direc
 
 }
 
-void UNPBaseProjectile::ActivateArrow()
+void UNPBaseProjectile::ApplyCorrection(const FVector& Direction)
+{
+
+}
+
+void UNPBaseProjectile::ActivateProjectile()
 {
 	SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	SetComponentTickEnabled(true);
 	SetGenerateOverlapEvents(true);
-	SetHiddenInGame(false);
+	//SetHiddenInGame(false);
+	SetActiveFlag(true);
 }
 
-void UNPBaseProjectile::DeactivateArrow()
+void UNPBaseProjectile::DeactivateProjectile()
 {
-	SetHiddenInGame(true);
+	//SetHiddenInGame(true);
 	SetGenerateOverlapEvents(false);
 	SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SetComponentTickEnabled(false);
+	SetActiveFlag(false);
 }

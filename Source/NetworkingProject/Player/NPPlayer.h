@@ -12,6 +12,7 @@
 #include "Camera/CameraComponent.h"
 #include "../Interfaces/PickupInterface.h"
 #include "GameFramework/SpringArmComponent.h"
+
 #include "NPPlayer.generated.h"
 
 class UNPMovementComponent;
@@ -36,6 +37,8 @@ class NETWORKINGPROJECT_API ANP_Player : public APawn, public IDamageableInterfa
 public:
 	ANP_Player();
 
+	void OnConstruction(const FTransform& Transform) override;
+
 	void Tick(float DeltaSeconds) override;
 
 	UFUNCTION(Server, Unreliable)
@@ -55,6 +58,17 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void Server_StartCharging();
+
+
+	UFUNCTION(BlueprintCallable)
+	int32 GetAmmoCount() const;
+
+	UFUNCTION(BlueprintCallable)
+	int32 GetCurrentHealth() const;
+
+	UFUNCTION(BlueprintCallable)
+	float GetCurrentCharge() const;
+
 
 	UFUNCTION(BlueprintPure)
 	int32 GetPing() const;
@@ -89,15 +103,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Shooting)
 	UStaticMesh* ProjectileMesh;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Shooting)
 	TArray<UNPArrowProjectile*> Arrows;
+
+	//free list
 
 	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	FDamageResult ReceiveDamage_Implementation(float Damage, AActor* Instigator) override;
 	bool CanDamage_Implementation() const override;
 
-
-	//Player Control Interface
 	void JumpPressed_Implementation() override;
 	void FireButtonPressed_Implementation() override;
 	void FireButtonReleased_Implementation() override;
@@ -110,11 +125,15 @@ public:
 	bool CanPickup_Implementation(const FNPAmmoPickupData& AmmoData) override;
 	void ReceivePickup_Implementation(const FNPAmmoPickupData& AmmoData) override;
 
-protected:
-	void BeginPlay() override;
-
 
 private:
+	const float LocationInterpolationSpeed = 5.0f;
+	const float RotationInterpolationSpeed = 5.0f;
+	const float MinDistance = 1.0f;
+
+
+
+
 	FVector MovementInput;
 	FVector TargetLocation;
 
@@ -131,11 +150,11 @@ private:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
 	float ArrowDamageMultiplier;
 
-	const float LocationInterpolationSpeed = 5.0f;
-	const float RotationInterpolationSpeed = 5.0f;
-	const float MinDistance = 1.0f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
 	int32 NumberOfArrowInstances;
-	int counter = 0;
+	int counter;
+protected:
+	void BeginPlay() override;
+
 };

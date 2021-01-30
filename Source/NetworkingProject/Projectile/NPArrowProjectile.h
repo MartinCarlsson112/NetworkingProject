@@ -6,10 +6,14 @@
 #include "Engine/EngineTypes.h"
 #include "NPArrowProjectile.generated.h"
 
+
+
+
 UCLASS(Blueprintable, BlueprintType)
 class NETWORKINGPROJECT_API UNPArrowProjectile : public UNPBaseProjectile
 {
-	GENERATED_BODY()
+GENERATED_BODY()
+
 public:
 	UNPArrowProjectile();
 	
@@ -28,16 +32,27 @@ public:
 	UFUNCTION(BlueprintCallable)
 	int GetTeam()const;
 
+
+	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+
+	void ApplyCorrection(const FVector& Direction) override;
+
 protected:
 	void BeginPlay() override;
-
+	
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Replicated)
+	FVector TargetLocation;
 
 	FVector InitialDirection;
 	FVector CurrentVelocity;
+	FVector LastPosition;
 	bool HasBeenFired;
 
 	UPROPERTY()
 	int TeamIndex = -1;
+
+	float VInterpSpeed = 5;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
 	float ArrowLifetime;

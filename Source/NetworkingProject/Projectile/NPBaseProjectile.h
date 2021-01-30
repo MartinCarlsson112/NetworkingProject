@@ -13,10 +13,12 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	virtual void Fire(const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier);
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void ApplyCorrection(const FVector& Direction);
 
-
-	virtual void ActivateArrow();
-	virtual void DeactivateArrow();
+	virtual void ActivateProjectile();
+	virtual void DeactivateProjectile();
 
 
 private:

@@ -2,15 +2,6 @@
 #include "NPPlayer.h"
 #include "../Interfaces/PlayerControlInterface.h"
 
-void ANPPlayerController::StartSession()
-{
-
-}
-
-void ANPPlayerController::EndSession()
-{
-}
-
 void ANPPlayerController::JumpPressed()
 {
 	if (GetPawn())
@@ -75,6 +66,80 @@ void ANPPlayerController::Look(float value)
 	}
 }
 
+int32 ANPPlayerController::GetAmmoCount() const
+{
+	auto TempPawn = GetPawn<ANP_Player>();
+	if (TempPawn)
+	{
+		return TempPawn->GetAmmoCount();
+	}
+	return 0;
+}
+
+int32 ANPPlayerController::GetCurrentHealth() const
+{
+	return 2;
+}
+
+float ANPPlayerController::GetChargeTime() const
+{
+	return 3;
+}
+
+void ANPPlayerController::ShowDebugMenu()
+{
+	CreateDebugWidget();
+
+	if (DebugMenuInstance == nullptr)
+	{
+		return;
+	}
+	DebugMenuInstance->SetVisibility(ESlateVisibility::Visible);
+	DebugMenuInstance->BP_OnShowWdiget();
+}
+
+void ANPPlayerController::HideDebugMenu()
+{
+	if (DebugMenuInstance == nullptr)
+	{
+		return;
+	}
+
+	DebugMenuInstance->SetVisibility(ESlateVisibility::Collapsed);
+	DebugMenuInstance->BP_OnHideWdiget();
+
+}
+
+void ANPPlayerController::CreateDebugWidget()
+{
+	if (DebugMenuClass == nullptr)
+	{
+		return;
+	}
+
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (DebugMenuInstance == nullptr)
+	{
+		DebugMenuInstance = CreateWidget<UNPNetDebugWidget>(GetWorld(), DebugMenuClass);
+		DebugMenuInstance->AddToViewport();
+	}
+
+}
+
+void ANPPlayerController::Handle_DebugMenuPressed()
+{
+	if (DebugMenuInstance == nullptr)
+	{
+		return;
+	}
+
+
+}
+
 void ANPPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -86,4 +151,15 @@ void ANPPlayerController::SetupInputComponent()
 	InputComponent->BindAction("Shoot", IE_Pressed, this, &ANPPlayerController::FireButtonPressed);
 	InputComponent->BindAction("Shoot", IE_Released, this, &ANPPlayerController::FireButtonReleased);
 	InputComponent->BindAxis("Look", this, &ANPPlayerController::Look);
+	InputComponent->BindAction("DebugMenu", IE_Pressed, this, &ANPPlayerController::Handle_DebugMenuPressed);
+}
+
+void ANPPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	CreateDebugWidget();
+	if (DebugMenuInstance != nullptr)
+	{
+		DebugMenuInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }

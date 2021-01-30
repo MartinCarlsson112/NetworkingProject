@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "../Debug/NPNetDebugWidget.h"
 #include "NPPlayerController.generated.h"
 
 /**
@@ -15,12 +16,6 @@ class NETWORKINGPROJECT_API ANPPlayerController : public APlayerController
 	GENERATED_BODY()
 	
 public:
-	UFUNCTION(BlueprintCallable)
-	void StartSession();
-
-	UFUNCTION(BlueprintCallable)
-	void EndSession();
-
 	UFUNCTION()	
 	void JumpPressed();
 
@@ -44,11 +39,35 @@ public:
 
 	UFUNCTION()
 	void Look(float value);
+	
+	UFUNCTION(BlueprintPure)
+	int32 GetAmmoCount() const;
+
+	UFUNCTION(BlueprintPure)
+	int32 GetCurrentHealth() const;
+
+	UFUNCTION(BlueprintPure)
+	float GetChargeTime() const;
+
+	void ShowDebugMenu();
+
+	void HideDebugMenu();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Debug)
+	TSubclassOf<UNPNetDebugWidget> DebugMenuClass;
 
 protected:
+	void CreateDebugWidget();
 
+	UPROPERTY(Transient)
+	UNPNetDebugWidget* DebugMenuInstance = nullptr;
+
+	void Handle_DebugMenuPressed();
 
 
 	void SetupInputComponent() override;
+
+
+	void BeginPlay() override;
 
 };

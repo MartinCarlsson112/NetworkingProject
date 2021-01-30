@@ -1,5 +1,7 @@
 #include "NPArrowProjectile.h"
 #include "../Interfaces/DamageableInterface.h"
+#include "Net/UnrealNetwork.h"
+#include "DrawDebugHelpers.h"
 UNPArrowProjectile::UNPArrowProjectile()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -13,14 +15,21 @@ UNPArrowProjectile::UNPArrowProjectile()
 
 void UNPArrowProjectile::Fire(const FVector& StartPosition, const FRotator& Direction, float Power, float DamageMultiplier)
 {
-	SetWorldLocation(StartPosition);
 	InitialDirection = Direction.Vector();
-	SetWorldRotation(Direction);
 	CurrentVelocity = Direction.Vector() * Power;
-	ActivateArrow();
-	SetActiveFlag(true); 
-	SetComponentTickEnabled(true);
-	GetWorld()->GetTimerManager().SetTimer(LifetimeTimerHandle, this, &UNPArrowProjectile::Expire, ArrowLifetime, false);
+	ActivateProjectile();
+
+	SetWorldRotation(Direction);
+	SetWorldLocation(StartPosition);
+	LastPosition = StartPosition;
+	TargetLocation = StartPosition + CurrentVelocity;
+	
+	if (GetOwner()->GetLocalRole() == ROLE_Authority)
+	{
+		GetWorld()->GetTimerManager().SetTimer(LifetimeTimerHandle, this, &UNPArrowProjectile::Expire, ArrowLifetime, false);
+	}
+
+
 }
 
 
@@ -58,24 +67,17 @@ void UNPArrowProjectile::OnCollision(class UPrimitiveComponent* OverlapComponent
 
 void UNPArrowProjectile::Expire()
 {
-	DeactivateArrow();
+	DeactivateProjectile();
 }
 
 void UNPArrowProjectile::BeginPlay()
 {
 	Super::BeginPlay();
-	DeactivateArrow();
-
+	DeactivateProjectile();
 	SetNotifyRigidBodyCollision(false);
-	SetCollisionProfileName("OverlapAll");
+	SetCollisionProfileName("OverlapAll");	
 	OnComponentBeginOverlap.AddDynamic(this, &UNPArrowProjectile::OnCollision);
 }
-
-
-//On collision
-//set ActorTickEnabled(false)
-//
-//return the pooled object
 
 void UNPArrowProjectile::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
@@ -87,10 +89,22 @@ void UNPArrowProjectile::TickComponent(float DeltaTime, enum ELevelTick TickType
 		auto DeltaGravity = (FVector(0, 0, -9.81f));
 
 		auto MovementVector = DeltaVelocity + DeltaGravity;
+
+
+		//DrawDebugLine(GetWorld(), GetComponentLocation(), GetComponentLocation() + DeltaVelocity + DeltaGravity, FColor::Red, false, 1.0f);
 		SetWorldLocation(GetComponentLocation() + DeltaVelocity + DeltaGravity);
+
 		CurrentVelocity = CurrentVelocity + DeltaGravity;
 
 		SetWorldRotation(MovementVector.ToOrientationRotator());
+
+		TargetLocation = GetComponentLocation();
+	}
+	else
+	{
+		FVector InterpolatedPosition = FMath::VInterpTo(LastPosition, TargetLocation, DeltaTime, VInterpSpeed);
+		LastPosition = InterpolatedPosition;
+		SetWorldLocation(InterpolatedPosition);
 	}
 }
 
@@ -102,4 +116,15 @@ void UNPArrowProjectile::SetTeam(int _TeamIndex)
 int UNPArrowProjectile::GetTeam() const
 {
 	return TeamIndex;
+}
+
+void UNPArrowProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UNPArrowProjectile, TargetLocation);
+}
+
+void UNPArrowProjectile::ApplyCorrection(const FVector& Direction)
+{
+	//TODO: implement this
 }

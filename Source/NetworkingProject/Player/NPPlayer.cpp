@@ -60,53 +60,21 @@ ANP_Player::ANP_Player()
 	}
 	FirePosition = CreateDefaultSubobject<USceneComponent>(TEXT("FirePosition"));
 	FirePosition->AttachToComponent(FPMesh, FAttachmentTransformRules::KeepRelativeTransform);
-
 	ThirdPersonSpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("ThirdPersonSpringArm"));
 	ThirdPersonSpringArm->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
 	ThirdPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("ThirdPersonCamera"));
 	ThirdPersonCamera->AttachToComponent(ThirdPersonSpringArm, FAttachmentTransformRules::KeepRelativeTransform);
-
 	ShootingComponent = CreateDefaultSubobject<UNPShootingComponent>(TEXT("ShootingComponent"));
 	AmmoComponent = CreateDefaultSubobject<UNPAmmoComponent>(TEXT("AmmoComponent"));
 	HealthComponent = CreateDefaultSubobject<UNPHealthComponent>(TEXT("HealthComponent"));
 	MovementComponent = CreateDefaultSubobject<UNPMovementComponent>(TEXT("MovementComponent"));
 
-	const FName ProjectileNames[] = {
-		TEXT("Projectile_1"),
-		TEXT("Projectile_2"),
-		TEXT("Projectile_3"),
-		TEXT("Projectile_4"),
-		TEXT("Projectile_5"),
-		TEXT("Projectile_6"),
-		TEXT("Projectile_7"),
-		TEXT("Projectile_8"),
-		TEXT("Projectile_9"),
-		TEXT("Projectile_0"),
-	};
-	Arrows.Empty();
-	for (int i = 0; i < 10; i++)
-	{
-		auto Arrow = CreateDefaultSubobject<UNPArrowProjectile>(ProjectileNames[i]);
-		Arrow->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
-		Arrow->SetIsReplicated(true);
-		Arrows.Add(Arrow);
-	}
-
 	MovementSpeed = 500.0f;
 	ArrowForce = 2000.0f;
 	NumberOfArrowInstances = 10;
+	counter = 0;
 	MovementInput = FVector::ZeroVector;
-	TargetLocation = GetActorLocation();
-}
-
-void ANP_Player::BeginPlay()
-{
-	Super::BeginPlay();		
-	ensure(ProjectileMesh != nullptr);
-	for (int i = 0; i < Arrows.Num(); i++)
-	{
-		Arrows[i]->SetStaticMesh(ProjectileMesh);
-	}
+	
 }
 
 void ANP_Player::Tick(float DeltaSeconds)
@@ -115,15 +83,8 @@ void ANP_Player::Tick(float DeltaSeconds)
 
 	if (IsLocallyControlled())
 	{
-		FNPMovementData MovementData = MovementComponent->CreateMovementData();
-		MovementComponent->SetFacingRotation(GetActorRotation());
-		MovementComponent->ApplyGravity();
-
-		auto Forward = GetActorForwardVector();
-		auto Right = GetActorRightVector();
-		MovementData.MovementDelta = (Forward * MovementInput.X + Right * MovementInput.Y) * DeltaSeconds * MovementSpeed;
-		MovementComponent->Move(MovementData);
-
+		MovementComponent->SetInput(MovementInput.X, MovementInput.Y);
+		MovementComponent->UpdateMovement(DeltaSeconds);
 		Server_SendMove(GetActorLocation());
 		Server_SendRotation(GetActorRotation());
 	}
@@ -181,11 +142,11 @@ void ANP_Player::Multicast_FireProjectile_Implementation(int ProjectileToShoot, 
 	if (!ensure(ProjectileToShoot != -1))
 		return;
 
-	//if (GetLocalRole() == ROLE_AutonomousProxy)
+	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
-		//NewRocket->ApplyCorrection(FacingRotation.Vector());
+		Arrows[ProjectileToShoot]->ApplyCorrection(FacingRotation.Vector());
 	}
-	//else
+	else
 	{
 		float ChargeAmount = ShootingComponent->Fire();
 		Arrows[ProjectileToShoot]->Fire(ArrowStartPosition, FacingRotation, ChargeAmount * ArrowForce , ArrowDamageMultiplier);
@@ -198,6 +159,13 @@ void ANP_Player::Server_StartCharging_Implementation()
 	{
 		ShootingComponent->StartCharging();
 	}
+}
+
+
+
+int32 ANP_Player::GetAmmoCount() const
+{
+	return AmmoComponent->GetAmmoCount(SelectedAmmoType);
 }
 
 int32 ANP_Player::GetPing() const
@@ -215,6 +183,47 @@ void ANP_Player::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ANP_Player, ReplicatedRotation);
+}
+
+
+void ANP_Player::BeginPlay()
+{
+	Super::BeginPlay();
+
+	//The arrow array is not replicated, so we need to fill the array on client side.
+	if (GetLocalRole() != ROLE_Authority)
+	{
+		auto Comps =  GetComponentsByClass(UNPArrowProjectile::StaticClass());
+		for (int i = 0; i < Comps.Num(); i++)
+		{
+			Arrows.Add(Cast<UNPArrowProjectile>(Comps[i]));
+		}
+	}
+	TargetLocation = GetActorLocation();
+
+
+
+}
+
+void ANP_Player::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	ensure(ProjectileMesh != nullptr);
+
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		//Create projectiles on server which are replicated to the clients.
+		for (int i = 0; i < NumberOfArrowInstances; i++)
+		{
+			auto Arrow = NewObject<UNPArrowProjectile>(this, NAME_None, RF_Transient);
+			Arrow->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+			Arrow->RegisterComponent();
+			Arrow->SetStaticMesh(ProjectileMesh);
+			Arrow->SetRelativeScale3D(FVector(2, 2, 2));
+			Arrow->SetIsReplicated(true);
+			Arrows.Add(Arrow);
+		}
+	}
 }
 
 void ANP_Player::ReceivePickup_Implementation(const FNPAmmoPickupData& AmmoData)
@@ -256,6 +265,13 @@ void ANP_Player::FireButtonReleased_Implementation()
 {
 	auto FacingRotation = GetControlRotation();
 	Server_FireProjectile(counter, FirePosition->GetComponentLocation(), FacingRotation);
+
+	if (GetLocalRole() != ROLE_Authority)
+	{
+		float ChargeAmount = ShootingComponent->Fire();
+		Arrows[counter]->Fire(FirePosition->GetComponentLocation(), FacingRotation, ChargeAmount * ArrowForce, ArrowDamageMultiplier);
+	}
+
 	counter++;
 	if (counter >= Arrows.Num())
 	{
@@ -275,20 +291,16 @@ void ANP_Player::FireButtonPressed_Implementation()
 
 void ANP_Player::JumpPressed_Implementation()
 {
-	if (MovementComponent->CanJump())
-	{
-		MovementComponent->Jump();
-	}
+	MovementComponent->Jump();
 }
 
 void ANP_Player::JumpReleased_Implementation()
 {
-
+	MovementComponent->StopJump();
 }
 
 bool ANP_Player::CanDamage_Implementation() const
 {
-	//For example if target is not supposed to be hittable etc.
 	return true;
 }
 

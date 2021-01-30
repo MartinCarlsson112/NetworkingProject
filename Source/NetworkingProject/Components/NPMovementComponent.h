@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/MovementComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "../NPMovementData.h"
 #include "NPMovementComponent.generated.h"
 
@@ -26,93 +27,60 @@ class NETWORKINGPROJECT_API UNPMovementComponent : public UMovementComponent
 public:
 	UNPMovementComponent();
 
-	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	void UpdateMovement(float DeltaTime);
 
-	FNPMovementData CreateMovementData() const;
-
-	void Move(FNPMovementData& FrameMovement);
-
-	void HandleLaunch(FVector& MovementDelta);
-	void ApplyGravity();
+	FVector GetInput() const;
+	void SetInput(float XAxis, float YAxis);
 	void LaunchCharacter(const FVector& LaunchVelocity, bool bXYOverride, bool bZOverride);
 
-	UPROPERTY(EditAnywhere, Category=Movement)
-	float Gravity;
+	void HandleLaunch(FVector& MovementDelta);
 
-	UPROPERTY(EditAnywhere, Category = Movement)
-	float FacingRotationSpeed;
+	bool CanJump() const;
 
-	FVector GetGravityAsVector() const { return FVector(0, 0, AccumulatedGravity); }
-	FRotator GetFacingRotation() const { return FacingRotationCurrent; }
-	FVector GetFacingDirection() const { return FacingRotationCurrent.Vector(); }
+	bool Jumping;
 
-	void SetFacingRotation(const FRotator& InFacingRotation, float InRotationSpeed = -1);
+	FVector InputVector;
+	FVector Velocity;
+	FVector Gravity = FVector(0, 0, -981.0f);
+	FVector GravityVector;
+	TArray<struct FHitResult> CollisionResults; 
+	TArray<struct FHitResult> GroundCheckResults;
+	float Friction = 1.0f;
+	float Acceleration = 500.0f;
 
-	void UpdateComponentRotationOnly();
+	TEnumAsByte<EMovementState> MovementState;
+	FVector Forward = FVector(1, 0, 0);
+	FVector Right = FVector(0, 1, 0);
+
+	FVector LaunchCharacterForce;
+
+
+	bool CheckGrounded(FVector Normal);
 
 	FTimerHandle JumpTimerHandle;
-	bool CanJump() const {
-		return MovementState == EMS_Grounded;
-	}
-	bool IsJumping() const{
+	bool IsJumping() const {
 		return GetWorld()->GetTimerManager().IsTimerActive(JumpTimerHandle);
 	}
 	void Jump();
 	void Jump_Impl();
+	void StopJump();
 
 
-
-	UPROPERTY(BlueprintAssignable)
-	FMovementStateDelegate Jumped;
-
-	UPROPERTY(BlueprintAssignable)
-	FMovementStateDelegate DoubleJumped;
-
-	UPROPERTY(BlueprintAssignable)
-	FMovementStateDelegate ClimbJumped;
-
-	UPROPERTY(BlueprintAssignable)
-	FMovementStateDelegate WallrunJumped;
-
-	UPROPERTY(BlueprintAssignable)
-	FMovementStateDelegate Dashed;
-
-	UPROPERTY(BlueprintAssignable)
-	FMovementStateDelegate StartedWallrunning;
-
-	UPROPERTY(BlueprintAssignable)
-	FMovementStateDelegate StoppedWallrunning;
-
-	UPROPERTY(BlueprintAssignable)
-	FMovementStateDelegate StartedClimbing;
-
-	UPROPERTY(BlueprintAssignable)
-	FMovementStateDelegate StoppedClimbing;
-
-private:
-	FVector GetMovementDelta(const FNPMovementData& FrameMovement) const;
+	void BeginPlay() override;
+	FCollisionShape CapsuleShape;
+	UCapsuleComponent* CapsuleComponent;
 
 	FVector PendingLaunchVelocity;
 	bool bHasLaunchVelocity;
 	bool bPendingZOverride;
 	bool bPendingXYOverride;
-
-	FHitResult GroundHitResult;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = General)
-	float CharacterHalfHeight;
-
 	float JumpAccu;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Jumping)
-	float JumpUpdateFreq;
+		float JumpUpdateFreq;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Jumping)
-	float JumpHeight;
+		float JumpHeight;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Jumping)
-	float JumpTime;
+		float JumpTime;
 
-	EMovementState MovementState;
-	FHitResult Hit;
-	FRotator FacingRotationCurrent;
-	FRotator FacingRotationTarget;
-	float AccumulatedGravity;
 };

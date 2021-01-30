@@ -1,93 +1,98 @@
 #include "NPMovementComponent.h"
-#include "DrawDebugHelpers.h"
 
+#include "DrawDebugHelpers.h"
 UNPMovementComponent::UNPMovementComponent()
 {
-	Gravity = 30;
-	FacingRotationSpeed = 1;
+	Jumping = false;
+
 	PrimaryComponentTick.bCanEverTick = true;
 	bHasLaunchVelocity = false;
 	bPendingXYOverride = false;
 	bPendingZOverride = false;
 
-	JumpHeight = 200.0f;
-	JumpTime = 0.25f;
+	JumpHeight = 300.0f;
+	JumpTime = 0.35f;
 	JumpAccu = 0;
 	JumpUpdateFreq = 0.01f;
+	MovementState = EMS_Falling;
 }
 
 
-void UNPMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UNPMovementComponent::UpdateMovement(float DeltaTime)
 {
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	FacingRotationCurrent = FQuat::Slerp(FacingRotationCurrent.Quaternion(), FacingRotationTarget.Quaternion(), FacingRotationSpeed * DeltaTime).Rotator();
-	if (FacingRotationCurrent.Equals(FacingRotationTarget))
-	{
-		FacingRotationCurrent = FacingRotationTarget;
-		SetComponentTickEnabled(false);
-	}
-}
-
-FNPMovementData UNPMovementComponent::CreateMovementData() const
-{
-	FNPMovementData MovementData;
-	MovementData.StartLocation = UpdatedComponent->GetComponentLocation();
-	return MovementData;
-}
-
-void UNPMovementComponent::Move(FNPMovementData& FrameMovement)
-{
-	Hit.Reset();
-	
-	FVector Delta = GetMovementDelta(FrameMovement) + FVector(0, 0, AccumulatedGravity);
-
+	Velocity = GetInput() * Acceleration * DeltaTime;
 	if (bHasLaunchVelocity)
 	{
-		HandleLaunch(Delta);
+		HandleLaunch(Velocity);
 	}
-	
-	MoveUpdatedComponent(Delta, FacingRotationCurrent, true, &Hit);
+	Velocity += GravityVector * DeltaTime;
+	FHitResult MoveHit;
+	//GEngine->AddOnScreenDebugMessage(INDEX_NONE, 0.1f, FColor::Blue, Velocity.ToString());
+	MoveUpdatedComponent(Velocity, GetOwner()->GetActorRotation().Quaternion(), true, &MoveHit);
+	//if(GetWorld()->LineTraceMultiByChannel(GroundCheckResults, UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentLocation() + ))
 
-	auto OwnerLoc = GetOwner()->GetActorLocation();
+	SlideAlongSurface(Velocity, 1.0f - MoveHit.Time, MoveHit.Normal, MoveHit);
 
+	bool FoundGround = false;
+	FHitResult GroundCheck;
 
-	FVector GroundStartLocation = GetOwner()->GetActorLocation() - FVector(0, 0, CharacterHalfHeight);
-	FVector GroundEndLocation = GroundStartLocation - FVector(0, 0, 10.0f);
-	DrawDebugLine(GetWorld(), GroundStartLocation, GroundEndLocation, FColor::Yellow, false, 1.0f);
+	FVector MoveDirection = Velocity;
 
-	FCollisionQueryParams CollisionQueryParams;
-	CollisionQueryParams.AddIgnoredActor(GetOwner());
-	CollisionQueryParams.bFindInitialOverlaps = true;
-
-	FCollisionShape MyBox = FCollisionShape::MakeBox(FVector(44.0f, 44.0f, 10.0f));
-	GetWorld()->SweepSingleByChannel(GroundHitResult, GroundStartLocation, GroundEndLocation, FQuat::Identity, ECC_WorldStatic, MyBox);
-
-	DrawDebugBox(GetWorld(), GroundStartLocation, FVector(44.0f, 44.0f, 10.0f), FColor::Yellow, false, 1.0f);
+	MoveDirection.Normalize(0.001f);
 
 
-	//GetWorld()->LineTraceSingleByChannel(GroundHitResult,
-	//	GroundStartLocation,
-	//	GroundEndLocation, ECC_WorldStatic, CollisionQueryParams);
-
-	if ((Hit.bBlockingHit && FVector::DotProduct(FVector::UpVector, Hit.Normal) > 0.0f) || GroundHitResult.bBlockingHit && FVector::DotProduct(FVector::UpVector, GroundHitResult.Normal) > 0)
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(GetOwner());
+	if (GetWorld()->SweepSingleByChannel(
+		GroundCheck,
+		UpdatedComponent->GetComponentLocation() + MoveDirection * 5.0f,
+		UpdatedComponent->GetComponentLocation() + -UpdatedComponent->GetUpVector() * 5.0f, 
+		FQuat::Identity, 
+		ECC_WorldDynamic, 
+		CapsuleShape, QueryParams))
 	{
-		MovementState = EMS_Grounded;
-		AccumulatedGravity = 0;
-		Delta = GetMovementDelta(FrameMovement);
-		GEngine->AddOnScreenDebugMessage(1, 0.1f, FColor::Emerald, "Grounded");
+		if (CheckGrounded(GroundCheck.ImpactNormal))
+		{
+			Forward = FVector::CrossProduct(GroundCheck.ImpactNormal, -UpdatedComponent->GetRightVector());
+			Right = FVector::CrossProduct(Forward, GroundCheck.ImpactNormal);
+			//DrawDebugLine(GetWorld(), UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentLocation() + Forward * 100.0f, FColor::Red, false, 1.0f);
+			//DrawDebugLine(GetWorld(), UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentLocation() + Right * 100.0f, FColor::Blue, false, 1.0f);
+			//DrawDebugLine(GetWorld(), GroundCheck.ImpactPoint, GroundCheck.ImpactPoint + GroundCheck.ImpactNormal * 100.0f, FColor::Green, false, 1.0f);
+
+			GravityVector = FVector::ZeroVector;
+			FoundGround = true;
+		}
+		
 	}
-	else 
+
+	if (!FoundGround)
 	{
+		GravityVector = Gravity;
+		Forward = GetOwner()->GetActorForwardVector();
 		MovementState = EMS_Falling;
-		GEngine->AddOnScreenDebugMessage(2, 0.05f, FColor::Emerald, "Not Grounded");
+		GEngine->AddOnScreenDebugMessage(1, 0.1f, FColor::Blue, "Falling");
+	}
+	else
+	{
+		GEngine->AddOnScreenDebugMessage(1, 0.1f, FColor::Blue, "Grounded");
+		MovementState = EMS_Grounded;
 	}
 
-
-	SlideAlongSurface(Delta, 1.0f - Hit.Time, Hit.Normal, Hit);
-
-	FrameMovement.Hit = Hit;
-	FrameMovement.FinalLocation = UpdatedComponent->GetComponentLocation();
+	//figure out if the player wants to wall climb
+	if (Jumping)
+	{
+		FHitResult WallClimbTraceHit;
+		auto WallClimbTraceStartLoc = UpdatedComponent->GetComponentLocation() + UpdatedComponent->GetForwardVector() * CapsuleComponent->GetScaledCapsuleRadius();
+		if (GetWorld()->LineTraceSingleByChannel(
+		WallClimbTraceHit, 
+		WallClimbTraceStartLoc,
+		WallClimbTraceStartLoc + UpdatedComponent->GetForwardVector() * 100.0f,
+		ECC_WorldDynamic, 
+		QueryParams))
+		{
+			LaunchCharacter(FVector(0, 0, 10), false, true);
+		}
+	}
 }
 
 void UNPMovementComponent::HandleLaunch(FVector& MovementDelta)
@@ -105,18 +110,13 @@ void UNPMovementComponent::HandleLaunch(FVector& MovementDelta)
 	}
 	else
 	{
-		AccumulatedGravity = 0;
+		GravityVector = FVector::ZeroVector;
 	}
 
 	MovementDelta = FinalVel;
 	bHasLaunchVelocity = false;
 	bPendingXYOverride = false;
 	bPendingZOverride = false;
-}
-
-void UNPMovementComponent::ApplyGravity()
-{
-	AccumulatedGravity -= Gravity * GetWorld()->GetDeltaSeconds();
 }
 
 void UNPMovementComponent::LaunchCharacter(const FVector& LaunchVelocity, bool bXYOverride, bool bZOverride)
@@ -127,32 +127,42 @@ void UNPMovementComponent::LaunchCharacter(const FVector& LaunchVelocity, bool b
 	bHasLaunchVelocity = true;
 }
 
-void UNPMovementComponent::SetFacingRotation(const FRotator& InFacingRotation, float InRotationSpeed)
+FVector UNPMovementComponent::GetInput() const
 {
-	FRotator NewRotation = InFacingRotation;
-	NewRotation.Roll = 0;
-	NewRotation.Pitch = 0;
-	FacingRotationTarget = NewRotation;
-
-	if (InRotationSpeed < 0.0f)
-	{
-		FacingRotationCurrent = NewRotation;
-		SetComponentTickEnabled(false);
-	}
-	else
-	{
-		SetComponentTickEnabled(true);
-	}
-
+	return InputVector;
 }
 
-void UNPMovementComponent::UpdateComponentRotationOnly()
+void UNPMovementComponent::SetInput(float XAxis, float YAxis)
 {
-	MoveUpdatedComponent(FVector::ZeroVector, FacingRotationCurrent, true, &Hit);
+	InputVector = (Forward * XAxis) + (-Right* YAxis);
+	InputVector.Normalize(0.001f);
+}
+
+void UNPMovementComponent::StopJump()
+{
+	Jumping = false;
+}
+
+bool UNPMovementComponent::CanJump() const
+{
+	return MovementState == EMS_Grounded;
+}
+
+bool UNPMovementComponent::CheckGrounded(FVector Normal)
+{
+	return FVector::DotProduct(FVector::UpVector, Normal) > 0.1f;
+}
+
+void UNPMovementComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	CapsuleComponent = (UCapsuleComponent*)GetOwner()->GetComponentByClass(UCapsuleComponent::StaticClass());
+	CapsuleShape = FCollisionShape::MakeCapsule(CapsuleComponent->GetScaledCapsuleRadius(), CapsuleComponent->GetScaledCapsuleHalfHeight());
 }
 
 void UNPMovementComponent::Jump()
 {
+	Jumping = true;
 	if (!IsJumping() && CanJump())
 	{
 		GetWorld()->GetTimerManager().SetTimer(JumpTimerHandle, this, &UNPMovementComponent::Jump_Impl, JumpUpdateFreq, true);
@@ -170,11 +180,6 @@ void UNPMovementComponent::Jump_Impl()
 	}
 	else if (JumpTime != 0)
 	{
-		LaunchCharacter(FVector(0, 0, (JumpHeight / JumpTime) * DeltaTime), false, true);
+		LaunchCharacter(Forward + FVector(0, 0, (JumpHeight / JumpTime) * DeltaTime), false, true);
 	}
-}
-
-FVector UNPMovementComponent::GetMovementDelta(const FNPMovementData& FrameMovement) const
-{
-	return FrameMovement.MovementDelta;
 }
