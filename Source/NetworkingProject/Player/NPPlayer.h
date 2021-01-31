@@ -51,7 +51,7 @@ public:
 	void Server_SendRotation(const FRotator& NewRotation);
 
 	UFUNCTION(Server, Reliable)
-	void Server_FireProjectile(int ProjectileToShoot, const FVector& ArrowStartPosition, const FRotator& FacingRotation);
+	void Server_FireProjectile(const FVector& ArrowStartPosition, const FRotator& FacingRotation);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_FireProjectile(int ProjectileToShoot, const FVector& ArrowStartPosition, const FRotator& FacingRotation);
@@ -106,12 +106,18 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Shooting)
 	TArray<UNPArrowProjectile*> Arrows;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated, Category = Shooting)
+	TArray<int> FreeList;
+
 	//free list
 
 	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	FDamageResult ReceiveDamage_Implementation(float Damage, AActor* Instigator) override;
 	bool CanDamage_Implementation() const override;
+
+	void ReturnArrow(int Index);
+	int GetArrow();
 
 	void JumpPressed_Implementation() override;
 	void FireButtonPressed_Implementation() override;
@@ -153,7 +159,6 @@ private:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = Shooting)
 	int32 NumberOfArrowInstances;
-	int counter;
 protected:
 	void BeginPlay() override;
 

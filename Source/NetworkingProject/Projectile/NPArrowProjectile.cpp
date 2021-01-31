@@ -71,10 +71,7 @@ void UNPArrowProjectile::OnCollision(class UPrimitiveComponent* OverlapComponent
 	}
 }
 
-void UNPArrowProjectile::Expire()
-{
-	DeactivateProjectile();
-}
+
 
 void UNPArrowProjectile::BeginPlay()
 {

@@ -23,8 +23,7 @@ public:
 	UFUNCTION()
 	void OnCollision(class UPrimitiveComponent* OverlapComponent, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
-	UFUNCTION()
-	void Expire();
+
 
 	UFUNCTION(BlueprintCallable)
 	void SetTeam(int TeamIndex);

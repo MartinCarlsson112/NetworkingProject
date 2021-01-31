@@ -72,7 +72,6 @@ ANP_Player::ANP_Player()
 	MovementSpeed = 500.0f;
 	ArrowForce = 2000.0f;
 	NumberOfArrowInstances = 10;
-	counter = 0;
 	MovementInput = FVector::ZeroVector;
 	
 }
@@ -129,11 +128,15 @@ void ANP_Player::Server_SendRotation_Implementation(const FRotator& NewRotation)
 	ReplicatedRotation = NewRotation;
 }
 
-void ANP_Player::Server_FireProjectile_Implementation(int ProjectileToShoot, const FVector& ArrowStartPosition, const FRotator& FacingRotation)
+void ANP_Player::Server_FireProjectile_Implementation(const FVector& ArrowStartPosition, const FRotator& FacingRotation)
 {
 	if (AmmoComponent->UseAmmo(SelectedAmmoType))
 	{
-		Multicast_FireProjectile(ProjectileToShoot, ArrowStartPosition, FacingRotation);
+		int ProjectileToShoot = GetArrow();
+		if (ProjectileToShoot != -1)
+		{
+			Multicast_FireProjectile(ProjectileToShoot, ArrowStartPosition, FacingRotation);
+		}
 	}
 }
 
@@ -193,6 +196,7 @@ void ANP_Player::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ANP_Player, ReplicatedRotation);
+	DOREPLIFETIME(ANP_Player, FreeList);
 }
 
 
@@ -206,9 +210,6 @@ void ANP_Player::BeginPlay()
 		GetComponents<UNPArrowProjectile>(Arrows);
 	}
 	TargetLocation = GetActorLocation();
-
-
-
 }
 
 void ANP_Player::OnConstruction(const FTransform& Transform)
@@ -227,7 +228,9 @@ void ANP_Player::OnConstruction(const FTransform& Transform)
 			Arrow->SetStaticMesh(ProjectileMesh);
 			Arrow->SetRelativeScale3D(FVector(2, 2, 2));
 			Arrow->SetIsReplicated(true);
+			Arrow->Initialize(i, this);
 			Arrows.Add(Arrow);
+			FreeList.Add(i);
 		}
 	}
 }
@@ -270,18 +273,21 @@ void ANP_Player::MoveForward_Implementation(float value)
 void ANP_Player::FireButtonReleased_Implementation()
 {
 	auto FacingRotation = GetControlRotation();
-	Server_FireProjectile(counter, FirePosition->GetComponentLocation(), FacingRotation);
+	Server_FireProjectile(FirePosition->GetComponentLocation(), FacingRotation);
 
 	if (GetLocalRole() != ROLE_Authority)
 	{
+		float ChargeAmount = ShootingComponent->Fire();
 		if (AmmoComponent->GetAmmoCount(SelectedAmmoType) > 0)
 		{
-			float ChargeAmount = ShootingComponent->Fire();
-			Arrows[counter]->Fire(FirePosition->GetComponentLocation(), FacingRotation, ChargeAmount * ArrowForce, ArrowDamageMultiplier);
-			counter++;
-			if (counter >= Arrows.Num())
+			auto ArrowIndex = GetArrow();
+			if (ArrowIndex != -1)
 			{
-				counter = 0;
+				auto Arrow = Arrows[ArrowIndex];
+				if (Arrow)
+				{
+					Arrow->Fire(FirePosition->GetComponentLocation(), FacingRotation, ChargeAmount * ArrowForce, ArrowDamageMultiplier);
+				}
 			}
 		}
 	}
@@ -310,6 +316,23 @@ void ANP_Player::JumpReleased_Implementation()
 bool ANP_Player::CanDamage_Implementation() const
 {
 	return true;
+}
+
+void ANP_Player::ReturnArrow(int Index)
+{
+	if (!FreeList.Contains(Index))
+	{
+		FreeList.Add(Index);
+	}
+}
+
+int ANP_Player::GetArrow()
+{
+	if (FreeList.Num() > 0)
+	{
+		return FreeList.Pop();
+	}
+	return -1;
 }
 
 FDamageResult ANP_Player::ReceiveDamage_Implementation(float Damage, AActor* _Instigator)
