@@ -226,8 +226,6 @@ void ANP_Player::OnConstruction(const FTransform& Transform)
 			Arrow->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
 			Arrow->RegisterComponent();
 			Arrow->SetStaticMesh(ProjectileMesh);
-			Arrow->SetRelativeScale3D(FVector(2, 2, 2));
-			Arrow->SetIsReplicated(true);
 			Arrow->Initialize(i, this);
 			Arrows.Add(Arrow);
 			FreeList.Add(i);
